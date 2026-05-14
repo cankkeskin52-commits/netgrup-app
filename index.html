@@ -495,7 +495,18 @@ textarea.form-input{resize:none;min-height:70px;}
 </style>
 </head>
 <body>
-<div id="app">
+<div id="login-screen" style="position:fixed;inset:0;background:#0d0b14;z-index:999;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px;">
+  <div style="font-size:48px;margin-bottom:16px">🔐</div>
+  <div style="font-size:24px;font-weight:900;color:#a78bfa;margin-bottom:6px;letter-spacing:-.5px">Net Grup</div>
+  <div style="font-size:13px;color:#6b6a8a;margin-bottom:36px;letter-spacing:.05em">YÖNETİM PANELİ</div>
+  <div style="width:100%;max-width:320px;display:flex;flex-direction:column;gap:12px;">
+    <input id="login-email" type="email" placeholder="E-posta" style="background:#16132a;border:1.5px solid rgba(139,92,246,.2);border-radius:12px;padding:14px 16px;color:#e2e0f0;font-size:15px;outline:none;width:100%;box-sizing:border-box;">
+    <input id="login-pass" type="password" placeholder="Şifre" style="background:#16132a;border:1.5px solid rgba(139,92,246,.2);border-radius:12px;padding:14px 16px;color:#e2e0f0;font-size:15px;outline:none;width:100%;box-sizing:border-box;" onkeydown="if(event.key==='Enter')doLogin()">
+    <button onclick="doLogin()" id="login-btn" style="background:linear-gradient(135deg,#7c3aed,#6d28d9);color:#fff;border:none;border-radius:12px;padding:15px;font-size:16px;font-weight:800;cursor:pointer;margin-top:4px;">Giriş Yap</button>
+    <div id="login-err" style="color:#f87171;font-size:13px;text-align:center;min-height:20px;"></div>
+  </div>
+</div>
+<div id="app" style="display:none;">
   <header class="hdr">
     <div class="hdr-brand">
       <div class="hdr-title">Net Grup</div>
@@ -901,18 +912,197 @@ textarea.form-input{resize:none;min-height:70px;}
 </div>
 
 <script>
-// ─── STORAGE ──────────────────────────────────────────────────────────────────
-const LS = {
-  get: k => { try { return JSON.parse(localStorage.getItem(k)||'[]'); } catch(e){ return []; } },
-  set: (k,v) => localStorage.setItem(k, JSON.stringify(v))
-};
-const getCustomers = () => LS.get('ng_customers');
-const getJobs = () => LS.get('ng_jobs');
-const getExpenses = () => LS.get('ng_expenses');
-const saveCustomers = v => LS.set('ng_customers', v);
-const saveJobs = v => LS.set('ng_jobs', v);
-const saveExpenses = v => LS.set('ng_expenses', v);
+// ─── FIREBASE CONFIG ──────────────────────────────────────────────────────────
+const FB_KEY='AIzaSyAeYOc5tufXdy2DVt1Fdxmq3j1PP4-vpeE';
+const FB_PID='clensmedya-a08a5';
+
+// ─── IN-MEMORY CACHE ──────────────────────────────────────────────────────────
+let customers = [];
+let jobs = [];
+let expenses = [];
+let db, uid;
+
+const getCustomers = () => customers;
+const getJobs = () => jobs;
+const getExpenses = () => expenses;
 const newId = () => Date.now().toString() + Math.random().toString(36).slice(2,6);
+
+function col(name) {
+  return db.collection('users').doc(uid).collection(name);
+}
+const serverTS = () => firebase.firestore.FieldValue.serverTimestamp();
+
+// ─── SDK LOADER ───────────────────────────────────────────────────────────────
+async function loadSDKs() {
+  const load = src => new Promise((r,j)=>{
+    if(document.querySelector(`script[src="${src}"]`)){r();return;}
+    const s=document.createElement('script');
+    s.src=src;s.onload=r;s.onerror=j;
+    document.head.appendChild(s);
+  });
+  await Promise.all([
+    load('https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js'),
+    load('https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js'),
+    load('https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js'),
+  ]);
+}
+
+// ─── APP INIT ─────────────────────────────────────────────────────────────────
+async function initApp() {
+  // Show spinner while loading
+  const ls = document.getElementById('login-screen');
+  ls.innerHTML = '<div style="display:flex;flex-direction:column;align-items:center;gap:16px;"><div style="width:40px;height:40px;border:3px solid rgba(167,139,250,.3);border-top-color:#a78bfa;border-radius:50%;animation:spin 0.8s linear infinite;"></div><div style="color:#6b6a8a;font-size:13px;">Yükleniyor...</div></div>';
+  // Add spin animation
+  if(!document.getElementById('spin-style')){
+    const st=document.createElement('style');
+    st.id='spin-style';
+    st.textContent='@keyframes spin{to{transform:rotate(360deg)}}';
+    document.head.appendChild(st);
+  }
+  try {
+    await loadSDKs();
+    if(!firebase.apps.length){
+      firebase.initializeApp({apiKey:FB_KEY,authDomain:FB_PID+'.firebaseapp.com',projectId:FB_PID});
+    }
+    db = firebase.firestore();
+    db.enablePersistence({synchronizeTabs:true}).catch(()=>{});
+  } catch(e) {
+    ls.innerHTML = '<div style="color:#f87171;text-align:center;padding:24px;">Firebase yüklenemedi. Sayfayı yenileyin.</div>';
+    return;
+  }
+
+  firebase.auth().onAuthStateChanged(user => {
+    if(user) {
+      uid = user.uid;
+      showLoginScreen(false);
+      startApp();
+    } else {
+      showLoginUI();
+    }
+  });
+}
+
+function showLoginScreen(visible) {
+  const ls = document.getElementById('login-screen');
+  const app = document.getElementById('app');
+  ls.style.display = visible ? 'flex' : 'none';
+  app.style.display = visible ? 'none' : 'flex';
+}
+
+function showLoginUI() {
+  const ls = document.getElementById('login-screen');
+  ls.style.display = 'flex';
+  ls.innerHTML = `
+    <div style="font-size:48px;margin-bottom:16px">🔐</div>
+    <div style="font-size:24px;font-weight:900;color:#a78bfa;margin-bottom:6px;letter-spacing:-.5px">Net Grup</div>
+    <div style="font-size:13px;color:#6b6a8a;margin-bottom:36px;letter-spacing:.05em">YÖNETİM PANELİ</div>
+    <div style="width:100%;max-width:320px;display:flex;flex-direction:column;gap:12px;">
+      <input id="login-email" type="email" placeholder="E-posta" style="background:#16132a;border:1.5px solid rgba(139,92,246,.2);border-radius:12px;padding:14px 16px;color:#e2e0f0;font-size:15px;outline:none;width:100%;box-sizing:border-box;">
+      <input id="login-pass" type="password" placeholder="Şifre" style="background:#16132a;border:1.5px solid rgba(139,92,246,.2);border-radius:12px;padding:14px 16px;color:#e2e0f0;font-size:15px;outline:none;width:100%;box-sizing:border-box;" onkeydown="if(event.key==='Enter')doLogin()">
+      <button onclick="doLogin()" id="login-btn" style="background:linear-gradient(135deg,#7c3aed,#6d28d9);color:#fff;border:none;border-radius:12px;padding:15px;font-size:16px;font-weight:800;cursor:pointer;margin-top:4px;">Giriş Yap</button>
+      <div id="login-err" style="color:#f87171;font-size:13px;text-align:center;min-height:20px;"></div>
+    </div>`;
+  document.getElementById('app').style.display = 'none';
+}
+
+async function doLogin() {
+  const email = document.getElementById('login-email').value.trim();
+  const pass = document.getElementById('login-pass').value;
+  const btn = document.getElementById('login-btn');
+  const err = document.getElementById('login-err');
+  if(!email||!pass){err.textContent='E-posta ve şifre gerekli';return;}
+  btn.textContent='Giriliyor...';btn.disabled=true;
+  try {
+    await firebase.auth().signInWithEmailAndPassword(email, pass);
+  } catch(e) {
+    if(e.code==='auth/user-not-found'||e.code==='auth/invalid-credential'||e.code==='auth/wrong-password'){
+      try {
+        await firebase.auth().createUserWithEmailAndPassword(email, pass);
+      } catch(e2) {
+        err.textContent = 'Giriş başarısız. Şifreyi kontrol edin.';
+      }
+    } else {
+      err.textContent = 'Giriş başarısız: '+(e.message||e.code);
+    }
+  }
+  btn.textContent='Giriş Yap';btn.disabled=false;
+}
+
+function doLogout() {
+  firebase.auth().signOut();
+}
+
+// ─── START APP (called after login) ──────────────────────────────────────────
+function startApp() {
+  migrateFromLocalStorage();
+
+  col('customers').orderBy('createdAt','desc').onSnapshot(snap => {
+    customers = snap.docs.map(d=>({id:d.id,...d.data()}));
+    refreshCurrentTab();
+  }, ()=>{});
+
+  col('jobs').orderBy('date','desc').onSnapshot(snap => {
+    jobs = snap.docs.map(d=>({id:d.id,...d.data()}));
+    refreshCurrentTab();
+  }, ()=>{});
+
+  col('expenses').orderBy('date','desc').onSnapshot(snap => {
+    expenses = snap.docs.map(d=>({id:d.id,...d.data()}));
+    refreshCurrentTab();
+  }, ()=>{});
+
+  requestNotifPermission();
+  checkUpcomingJobs();
+  switchTab('panel');
+  setTimeout(requestNotifPermission, 2000);
+
+  // Setup swipe-to-close
+  let touchStartY = 0;
+  document.querySelectorAll('.sheet').forEach(sheet=>{
+    sheet.addEventListener('touchstart', e=>{ touchStartY = e.touches[0].clientY; }, {passive:true});
+    sheet.addEventListener('touchmove', e=>{
+      const dy = e.touches[0].clientY - touchStartY;
+      if(dy > 80) { closeAllSheets(); }
+    }, {passive:true});
+  });
+
+  // Set today's date for forms
+  document.getElementById('jf-date').value = todayStr();
+  document.getElementById('ef-date').value = todayStr();
+}
+
+// ─── MIGRATE FROM LOCALSTORAGE ───────────────────────────────────────────────
+function migrateFromLocalStorage() {
+  try {
+    const lsCustomers = JSON.parse(localStorage.getItem('ng_customers')||'[]');
+    const lsJobs = JSON.parse(localStorage.getItem('ng_jobs')||'[]');
+    const lsExpenses = JSON.parse(localStorage.getItem('ng_expenses')||'[]');
+    if(lsCustomers.length > 0) {
+      const batch = db.batch();
+      lsCustomers.forEach(c=>{
+        const ref = col('customers').doc(c.id||newId());
+        batch.set(ref,{...c,migratedAt:serverTS()});
+      });
+      batch.commit().then(()=>{localStorage.removeItem('ng_customers');showToast('✅ Eski veriler aktarıldı');}).catch(()=>{});
+    }
+    if(lsJobs.length > 0) {
+      const batch = db.batch();
+      lsJobs.forEach(j=>{
+        const ref = col('jobs').doc(j.id||newId());
+        batch.set(ref,{...j,migratedAt:serverTS()});
+      });
+      batch.commit().then(()=>localStorage.removeItem('ng_jobs')).catch(()=>{});
+    }
+    if(lsExpenses.length > 0) {
+      const batch = db.batch();
+      lsExpenses.forEach(e=>{
+        const ref = col('expenses').doc(e.id||newId());
+        batch.set(ref,{...e,migratedAt:serverTS()});
+      });
+      batch.commit().then(()=>localStorage.removeItem('ng_expenses')).catch(()=>{});
+    }
+  } catch(e) {}
+}
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
 const months = ['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
@@ -985,7 +1175,7 @@ function switchTab(tab) {
   if(tab==='musteriler') renderCustomers();
   if(tab==='takvim') renderCalendar();
   if(tab==='finans') renderFinans();
-  if(tab==='teklifler') { renderQuotes(); initFirebase(); }
+  if(tab==='teklifler') { renderQuotes(); initQuotesListener(); }
 }
 
 // ─── SHEETS ───────────────────────────────────────────────────────────────────
@@ -1185,11 +1375,12 @@ function openCustDetail(id) {
 }
 
 function deleteCust(id) {
-  confirm2('Bu müşteriyi silmek istiyor musun?','🗑️','Sil','btn-danger',()=>{
-    saveCustomers(getCustomers().filter(c=>c.id!==id));
-    closeSheet('sheet-cust-detail');
-    renderCustomers();
-    showToast('Müşteri silindi');
+  confirm2('Bu müşteriyi silmek istiyor musun?','🗑️','Sil','btn-danger',async ()=>{
+    try {
+      await col('customers').doc(id).delete();
+      closeSheet('sheet-cust-detail');
+      showToast('🗑️ Müşteri silindi');
+    } catch(e){ showToast('❌ Silme hatası'); }
   });
 }
 
@@ -1215,29 +1406,25 @@ function openCustomerForm(cat, editId) {
   }
   openSheet('sheet-cust-form');
 }
-function saveCustomer() {
-  const name = document.getElementById('cf-name').value.trim();
-  const phone = document.getElementById('cf-phone').value.trim();
-  const cat = document.getElementById('cf-cat').value;
-  if(!name){showToast('⚠️ Ad zorunlu');return;}
-  if(!phone){showToast('⚠️ Telefon zorunlu');return;}
-  const custs = getCustomers();
-  const editId = document.getElementById('cf-id').value;
-  if(editId){
-    const idx = custs.findIndex(c=>c.id===editId);
-    if(idx>-1){
-      custs[idx]={...custs[idx],name,phone,address:document.getElementById('cf-address').value.trim(),category:cat,notes:document.getElementById('cf-notes').value.trim()};
-      saveCustomers(custs);
-      showToast('✅ Müşteri güncellendi');
+async function saveCustomer() {
+  const id = document.getElementById('cf-id').value;
+  const data = {
+    name: document.getElementById('cf-name').value.trim(),
+    phone: document.getElementById('cf-phone').value.trim(),
+    address: document.getElementById('cf-address').value.trim(),
+    category: document.getElementById('cf-cat').value,
+    notes: document.getElementById('cf-notes').value.trim(),
+  };
+  if(!data.name||!data.phone||!data.category){showToast('⚠️ Zorunlu alanları doldurun');return;}
+  try {
+    if(id) {
+      await col('customers').doc(id).update(data);
+    } else {
+      await col('customers').add({...data, createdAt: serverTS()});
     }
-  } else {
-    custs.push({id:newId(),name,phone,address:document.getElementById('cf-address').value.trim(),category:cat,notes:document.getElementById('cf-notes').value.trim(),createdAt:new Date().toISOString()});
-    saveCustomers(custs);
-    showToast('✅ Müşteri eklendi');
-  }
-  closeSheet('sheet-cust-form');
-  if(currentTab==='musteriler') renderCustomers();
-  if(currentTab==='panel') renderPanel();
+    closeSheet('sheet-cust-form');
+    showToast('✅ Müşteri kaydedildi');
+  } catch(e) { showToast('❌ Kayıt hatası'); }
 }
 
 // ─── JOB FORM ─────────────────────────────────────────────────────────────────
@@ -1343,55 +1530,48 @@ function selectJobCust(id) {
   _jobFormCat = c.category;
 }
 
-function saveJob() {
+async function saveJob() {
   const custId = document.getElementById('jf-cust-id').value;
   const custName = document.getElementById('jf-cust-search').value.trim();
   const date = document.getElementById('jf-date').value;
-  const time = document.getElementById('jf-time').value;
-  const address = document.getElementById('jf-address').value.trim();
-  const amount = parseFloat(document.getElementById('jf-amount').value)||0;
   if(!custName){showToast('⚠️ Müşteri seçin');return;}
   if(!date){showToast('⚠️ Tarih zorunlu');return;}
 
   const cat = _jobFormCat || (custId?getCustomers().find(c=>c.id===custId)?.category:null) || 'temizlik';
-  const jobs = getJobs();
   const editId = document.getElementById('jf-id').value;
   const base = {
     customerId: custId,
     customerName: custName,
     category: cat,
-    date, time, address,
-    payAmount: amount,
+    date,
+    time: document.getElementById('jf-time').value,
+    address: document.getElementById('jf-address').value.trim(),
+    payAmount: parseFloat(document.getElementById('jf-amount').value)||0,
     payType: document.getElementById('jf-pay-type').value,
     payStatus: document.getElementById('jf-pay-status').value,
     status: document.getElementById('jf-status').value,
-    notes: document.getElementById('jf-notes').value.trim()
+    notes: document.getElementById('jf-notes').value.trim(),
+    pestType: document.getElementById('jf-pest-type').value,
+    area: parseFloat(document.getElementById('jf-area').value)||0,
+    chemical: document.getElementById('jf-chemical').value.trim(),
+    cleanType: document.getElementById('jf-clean-type').value,
+    roomCount: parseInt(document.getElementById('jf-rooms').value)||0,
+    staffCount: parseInt(document.getElementById('jf-staff').value)||1,
+    origin: document.getElementById('jf-origin').value.trim(),
+    destination: document.getElementById('jf-dest').value.trim(),
+    loadType: document.getElementById('jf-load-type').value,
+    km: parseFloat(document.getElementById('jf-km').value)||0,
+    vehiclePlate: document.getElementById('jf-plate').value.trim(),
   };
-  if(cat==='ilaclama'){
-    base.pestType=document.getElementById('jf-pest-type').value;
-    base.area=parseFloat(document.getElementById('jf-area').value)||0;
-    base.chemical=document.getElementById('jf-chemical').value.trim();
-  } else if(cat==='temizlik'){
-    base.cleanType=document.getElementById('jf-clean-type').value;
-    base.roomCount=parseInt(document.getElementById('jf-rooms').value)||0;
-    base.staffCount=parseInt(document.getElementById('jf-staff').value)||1;
-  } else if(cat==='nakliye'){
-    base.origin=document.getElementById('jf-origin').value.trim();
-    base.destination=document.getElementById('jf-dest').value.trim();
-    base.loadType=document.getElementById('jf-load-type').value;
-    base.km=parseFloat(document.getElementById('jf-km').value)||0;
-    base.vehiclePlate=document.getElementById('jf-plate').value.trim();
-  }
-  if(editId){
-    const idx=jobs.findIndex(j=>j.id===editId);
-    if(idx>-1){jobs[idx]={...jobs[idx],...base};saveJobs(jobs);showToast('✅ Hizmet güncellendi');}
-  } else {
-    jobs.push({id:newId(),...base,createdAt:new Date().toISOString()});
-    saveJobs(jobs);
-    showToast('✅ Hizmet eklendi');
-  }
-  closeSheet('sheet-job-form');
-  refreshCurrentTab();
+  try {
+    if(editId) {
+      await col('jobs').doc(editId).update(base);
+    } else {
+      await col('jobs').add({...base, createdAt: serverTS()});
+    }
+    closeSheet('sheet-job-form');
+    showToast('✅ Hizmet kaydedildi');
+  } catch(e) { showToast('❌ Kayıt hatası'); }
 }
 
 function refreshCurrentTab() {
@@ -1459,22 +1639,27 @@ function openJobDetail(id) {
   `;
   openSheet('sheet-job-detail');
 }
-function changeJobStatus(id, status) {
-  const jobs = getJobs();
-  const idx = jobs.findIndex(j=>j.id===id);
-  if(idx>-1){jobs[idx].status=status;saveJobs(jobs);showToast('✅ Durum güncellendi');closeSheet('sheet-job-detail');refreshCurrentTab();}
+async function changeJobStatus(id, status) {
+  try {
+    await col('jobs').doc(id).update({status});
+    showToast('✅ Durum güncellendi');
+    closeSheet('sheet-job-detail');
+  } catch(e){ showToast('❌ Güncelleme hatası'); }
 }
-function changePayStatus(id, status) {
-  const jobs = getJobs();
-  const idx = jobs.findIndex(j=>j.id===id);
-  if(idx>-1){jobs[idx].payStatus=status;saveJobs(jobs);showToast('✅ Ödeme güncellendi');closeSheet('sheet-job-detail');refreshCurrentTab();}
+async function changePayStatus(id, status) {
+  try {
+    await col('jobs').doc(id).update({payStatus:status});
+    showToast('✅ Ödeme güncellendi');
+    closeSheet('sheet-job-detail');
+  } catch(e){ showToast('❌ Güncelleme hatası'); }
 }
 function deleteJob(id) {
-  confirm2('Bu hizmeti silmek istiyor musun?','🗑️','Sil','btn-danger',()=>{
-    saveJobs(getJobs().filter(j=>j.id!==id));
-    closeSheet('sheet-job-detail');
-    refreshCurrentTab();
-    showToast('Hizmet silindi');
+  confirm2('Bu hizmeti silmek istiyor musun?','🗑️','Sil','btn-danger',async ()=>{
+    try {
+      await col('jobs').doc(id).delete();
+      closeSheet('sheet-job-detail');
+      showToast('🗑️ Hizmet silindi');
+    } catch(e){ showToast('❌ Silme hatası'); }
   });
 }
 
@@ -1506,25 +1691,26 @@ function openExpenseForm(editId) {
   toggleKmField();
   openSheet('sheet-exp-form');
 }
-function saveExpense() {
-  const type=document.getElementById('ef-type').value;
-  const date=document.getElementById('ef-date').value;
-  const amount=parseFloat(document.getElementById('ef-amount').value)||0;
-  if(!date){showToast('⚠️ Tarih zorunlu');return;}
-  if(!amount){showToast('⚠️ Tutar zorunlu');return;}
-  const expenses=getExpenses();
-  const editId=document.getElementById('ef-id').value;
-  const obj={type,date,amount,description:document.getElementById('ef-desc').value.trim(),vehicle:document.getElementById('ef-vehicle').value.trim(),km:parseFloat(document.getElementById('ef-km').value)||0};
-  if(editId){
-    const idx=expenses.findIndex(e=>e.id===editId);
-    if(idx>-1){expenses[idx]={...expenses[idx],...obj};saveExpenses(expenses);showToast('✅ Gider güncellendi');}
-  } else {
-    expenses.push({id:newId(),...obj,createdAt:new Date().toISOString()});
-    saveExpenses(expenses);
-    showToast('✅ Gider eklendi');
-  }
-  closeSheet('sheet-exp-form');
-  if(currentTab==='finans') renderFinans();
+async function saveExpense() {
+  const id = document.getElementById('ef-id').value;
+  const data = {
+    type: document.getElementById('ef-type').value,
+    date: document.getElementById('ef-date').value,
+    amount: parseFloat(document.getElementById('ef-amount').value)||0,
+    description: document.getElementById('ef-desc').value.trim(),
+    vehicle: document.getElementById('ef-vehicle').value.trim(),
+    km: parseFloat(document.getElementById('ef-km').value)||0,
+  };
+  if(!data.date||!data.amount){showToast('⚠️ Tarih ve tutar gerekli');return;}
+  try {
+    if(id) {
+      await col('expenses').doc(id).update(data);
+    } else {
+      await col('expenses').add({...data, createdAt: serverTS()});
+    }
+    closeSheet('sheet-exp-form');
+    showToast('✅ Gider kaydedildi');
+  } catch(e) { showToast('❌ Kayıt hatası'); }
 }
 
 // ─── CALENDAR ─────────────────────────────────────────────────────────────────
@@ -1714,33 +1900,15 @@ let firebaseLoaded = false;
 let fbUnsubscribe = null;
 const knownQuoteIds = new Set();
 let isFirstQuoteLoad = true;
+let quotesListenerStarted = false;
 
-function initFirebase() {
-  if(firebaseLoaded) return;
-  firebaseLoaded = true;
-  const script1 = document.createElement('script');
-  script1.src='https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js';
-  script1.onload = ()=>{
-    const script2 = document.createElement('script');
-    script2.src='https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js';
-    script2.onload = startFirebaseListener;
-    document.head.appendChild(script2);
-  };
-  document.head.appendChild(script1);
-}
-
-function startFirebaseListener() {
+function initQuotesListener() {
+  if(quotesListenerStarted || !db) return;
+  quotesListenerStarted = true;
   try {
-    const FB_KEY='AIzaSyAeYOc5tufXdy2DVt1Fdxmq3j1PP4-vpeE';
-    const FB_PID='clensmedya-a08a5';
-    if(!firebase.apps.length){
-      firebase.initializeApp({apiKey:FB_KEY,projectId:FB_PID});
-    }
-    const db = firebase.firestore();
     fbUnsubscribe = db.collection('ng_quotes').orderBy('createdAt','desc').onSnapshot(snap=>{
       const quotes = [];
       snap.forEach(doc=>quotes.push({id:doc.id,...doc.data()}));
-      // detect new
       if(!isFirstQuoteLoad){
         quotes.forEach(q=>{
           if(!knownQuoteIds.has(q.id)&&q.status==='new'){
@@ -1753,9 +1921,10 @@ function startFirebaseListener() {
       window._ngQuotes = quotes;
       renderQuotes();
       updateQuoteBadge(quotes);
+    }, err=>{
+      document.getElementById('quotes-list').innerHTML='<div class="empty"><span class="empty-icon">⚠️</span><span class="empty-text">Teklifler yüklenemedi</span></div>';
     });
   } catch(err){
-    console.warn('Firebase init failed',err);
     document.getElementById('quotes-list').innerHTML='<div class="empty"><span class="empty-icon">⚠️</span><span class="empty-text">Teklifler yüklenemedi</span></div>';
   }
 }
@@ -1828,14 +1997,13 @@ function openQuoteDetail(id) {
 }
 
 function updateQuoteStatus(id, status) {
-  try {
-    const db = firebase.firestore();
-    db.collection('ng_quotes').doc(id).update({status}).then(()=>{showToast('✅ Durum güncellendi');}).catch(()=>showToast('⚠️ Güncelleme başarısız'));
-  } catch(e){showToast('⚠️ Firebase bağlantısı yok');}
   // optimistic local update
   const quotes = window._ngQuotes||[];
   const q = quotes.find(x=>x.id===id);
   if(q){q.status=status;renderQuotes();updateQuoteBadge(quotes);}
+  if(db) db.collection('ng_quotes').doc(id).update({status})
+    .then(()=>showToast('✅ Durum güncellendi'))
+    .catch(()=>showToast('⚠️ Güncelleme başarısız'));
 }
 
 function convertQuoteToJob(id) {
@@ -1847,10 +2015,13 @@ function convertQuoteToJob(id) {
   let custs = getCustomers();
   let cust = custs.find(c=>c.phone&&c.phone===q.phone);
   if(!cust && q.name){
-    cust = {id:newId(),name:q.name||'',phone:q.phone||'',address:q.address||'',category:q.type||'temizlik',notes:'',createdAt:new Date().toISOString()};
-    custs.push(cust);
-    saveCustomers(custs);
-    showToast('✅ Müşteri oluşturuldu');
+    const newCust = {name:q.name||'',phone:q.phone||'',address:q.address||'',category:q.type||'temizlik',notes:'',createdAt:new Date().toISOString()};
+    col('customers').add({...newCust,createdAt:serverTS()}).then(ref=>{
+      showToast('✅ Müşteri oluşturuldu');
+      switchTab('musteriler');
+      setTimeout(()=>openJobForm(null,ref.id),600);
+    });
+    return;
   }
   switchTab('musteriler');
   setTimeout(()=>openJobForm(null,cust?.id),300);
@@ -1881,16 +2052,19 @@ function checkUpcomingJobs() {
 // ─── SETTINGS SHEET (simple) ──────────────────────────────────────────────────
 function openSettings() {
   const custs = getCustomers().length;
-  const jobs = getJobs().length;
+  const jbs = getJobs().length;
   const exps = getExpenses().length;
+  const userEmail = firebase.auth().currentUser?.email || '';
   const body = document.createElement('div');
   body.innerHTML = `
     <div style="font-size:24px;text-align:center;margin-bottom:16px;">⚙️</div>
-    <div class="detail-row"><span class="detail-lbl">Müşteri Sayısı</span><span class="detail-val">${custs}</span></div>
-    <div class="detail-row"><span class="detail-lbl">Hizmet Sayısı</span><span class="detail-val">${jobs}</span></div>
-    <div class="detail-row"><span class="detail-lbl">Gider Sayısı</span><span class="detail-val">${exps}</span></div>
+    <div class="detail-row"><span class="detail-lbl">Kullanıcı</span><span class="detail-val" style="font-size:12px">${userEmail}</span></div>
+    <div class="detail-row"><span class="detail-lbl">Müşteri</span><span class="detail-val">${custs}</span></div>
+    <div class="detail-row"><span class="detail-lbl">Hizmet</span><span class="detail-val">${jbs}</span></div>
+    <div class="detail-row"><span class="detail-lbl">Gider</span><span class="detail-val">${exps}</span></div>
     <div class="divider"></div>
     <button class="btn btn-secondary" style="width:100%;margin-bottom:10px;" onclick="requestNotifPermission().then(()=>showToast('✅ Bildirim izni alındı'))">🔔 Bildirim İzni Al</button>
+    <button class="btn btn-secondary" style="width:100%;margin-bottom:10px;" onclick="firebase.auth().signOut()">🔐 Çıkış Yap</button>
     <button class="btn btn-danger" style="width:100%;" onclick="clearAllData()">🗑️ Tüm Verileri Sil</button>
   `;
   // Use confirm sheet for now since we don't have a generic sheet
@@ -1900,12 +2074,12 @@ function openSettings() {
   openSheet('sheet-job-detail');
 }
 function clearAllData() {
-  confirm2('TÜM verileri silmek istediğinize emin misiniz? Bu geri alınamaz!','⚠️','Evet, Sil','btn-danger',()=>{
-    localStorage.removeItem('ng_customers');
-    localStorage.removeItem('ng_jobs');
-    localStorage.removeItem('ng_expenses');
-    showToast('🗑️ Tüm veriler silindi');
-    renderPanel();
+  confirm2('TÜM verileri silmek istediğinize emin misiniz? Bu geri alınamaz!','⚠️','Evet, Sil','btn-danger', async ()=>{
+    try {
+      const dels = (colName) => col(colName).get().then(snap=>Promise.all(snap.docs.map(d=>d.ref.delete())));
+      await Promise.all([dels('customers'),dels('jobs'),dels('expenses')]);
+      showToast('🗑️ Tüm veriler silindi');
+    } catch(e){ showToast('❌ Silme hatası'); }
   });
 }
 
@@ -1938,23 +2112,7 @@ const _origSwitchTab = switchTab;
 
 // ─── INIT ─────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', ()=>{
-  renderPanel();
-  // Set today's date for forms
-  document.getElementById('jf-date').value = todayStr();
-  document.getElementById('ef-date').value = todayStr();
-  // Request notification permission
-  setTimeout(requestNotifPermission, 2000);
-  // Check upcoming jobs for tomorrow notifications
-  setTimeout(checkUpcomingJobs, 3000);
-  // Swipe to close sheets
-  let touchStartY = 0;
-  document.querySelectorAll('.sheet').forEach(sheet=>{
-    sheet.addEventListener('touchstart', e=>{ touchStartY = e.touches[0].clientY; }, {passive:true});
-    sheet.addEventListener('touchmove', e=>{
-      const dy = e.touches[0].clientY - touchStartY;
-      if(dy > 80) { closeAllSheets(); }
-    }, {passive:true});
-  });
+  initApp();
 });
 
 // Patch switchTab to hide/show FAB
