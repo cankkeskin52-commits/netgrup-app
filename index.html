@@ -335,13 +335,20 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-
     <div class="bar-wrap" id="ozet-ciro"></div>
   </div>
 
+  <!-- TEKLİFLER PAGE -->
+  <div class="page" id="page-quotes">
+    <div class="sec-lbl">SİTEDEN GELEN TEKLİF TALEPLERİ</div>
+    <div id="quotes-list" style="padding:0 14px;display:flex;flex-direction:column;gap:10px;"></div>
+  </div>
+
   <!-- BOTTOM NAV -->
-  <div class="bnav">
+  <div class="bnav" style="grid-template-columns:repeat(6,1fr);">
     <div class="bnav-item active" data-tab="panel" onclick="goTab('panel')"><div class="bnav-icon">🏠</div><div class="bnav-label">Panel</div></div>
     <div class="bnav-item" data-tab="jobs" onclick="goTab('jobs')"><div class="bnav-icon">📋</div><div class="bnav-label">İşler</div></div>
-    <div class="bnav-item" data-tab="custs" onclick="goTab('custs')"><div class="bnav-icon">👥</div><div class="bnav-label">Müşteriler</div></div>
+    <div class="bnav-item" data-tab="custs" onclick="goTab('custs')"><div class="bnav-icon">👥</div><div class="bnav-label">Müşteri</div></div>
     <div class="bnav-item" data-tab="gelir" onclick="goTab('gelir')"><div class="bnav-icon">💰</div><div class="bnav-label">Gelir</div></div>
     <div class="bnav-item" data-tab="ozet" onclick="goTab('ozet')"><div class="bnav-icon">📊</div><div class="bnav-label">Özet</div></div>
+    <div class="bnav-item" data-tab="quotes" onclick="goTab('quotes')" id="bnav-quotes"><div class="bnav-icon">🔔</div><div class="bnav-label">Teklifler</div><div class="bnav-badge" id="quotes-badge">0</div></div>
   </div>
 </div>
 
@@ -446,6 +453,106 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-
 <div id="toast-wrap"></div>
 
 <script>
+/* ══ FIREBASE ══ */
+const FB_KEY='AIzaSyAeYOc5tufXdy2DVt1Fdxmq3j1PP4-vpeE';
+const FB_PID='clensmedya-a08a5';
+let fbDb=null,fbReady=false;
+let quotes=[];
+
+async function initFB(){
+  if(fbReady)return true;
+  try{
+    await Promise.all([
+      new Promise((r,j)=>{const s=document.createElement('script');s.src='https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js';s.onload=r;s.onerror=j;document.head.appendChild(s);}),
+      new Promise((r,j)=>{const s=document.createElement('script');s.src='https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js';s.onload=r;s.onerror=j;document.head.appendChild(s);})
+    ]);
+    if(!firebase.apps.length) firebase.initializeApp({apiKey:FB_KEY,authDomain:FB_PID+'.firebaseapp.com',projectId:FB_PID});
+    fbDb=firebase.firestore();
+    fbReady=true;
+    listenQuotes();
+    return true;
+  }catch(e){return false;}
+}
+
+function listenQuotes(){
+  if(!fbDb)return;
+  fbDb.collection('ng_quotes').orderBy('createdAt','desc').onSnapshot(snap=>{
+    quotes=snap.docs.map(d=>({id:d.id,...d.data()}));
+    renderQuotes();
+    updateQuotesBadge();
+  });
+}
+
+function updateQuotesBadge(){
+  const newQ=quotes.filter(q=>q.status==='new').length;
+  const badge=document.getElementById('quotes-badge');
+  if(badge){badge.textContent=newQ;badge.style.display=newQ?'flex':'none';}
+}
+
+async function markQuoteRead(id){
+  if(!fbDb)return;
+  await fbDb.collection('ng_quotes').doc(id).update({status:'read'});
+  toast('Okundu işaretlendi','info');
+}
+
+async function markQuoteDone(id){
+  if(!fbDb)return;
+  await fbDb.collection('ng_quotes').doc(id).update({status:'done'});
+  toast('Tamamlandı ✓','ok');
+}
+
+async function deleteQuote(id){
+  if(!fbDb)return;
+  await fbDb.collection('ng_quotes').doc(id).delete();
+  toast('Silindi','err');
+}
+
+function convertToJob(q){
+  // Formu doldur ve modal'ı aç
+  closeOv('ov-detail');
+  goTab('jobs');
+  setTimeout(()=>{
+    openJobModal();
+    document.getElementById('f-jname').value=q.name||'';
+    document.getElementById('f-jphone').value=q.phone||'';
+    if(q.type) document.getElementById('f-jtype').value=q.type;
+    document.getElementById('f-jnote').value=q.message||'';
+    toast('Form dolduruldu, kaydedin ✓','ok');
+  },300);
+}
+
+function renderQuotes(){
+  const el=document.getElementById('quotes-list');
+  if(!el)return;
+  if(!quotes.length){
+    el.innerHTML='<div class="empty-s"><div class="ei">🔔</div><div class="et">Henüz teklif talebi yok</div></div>';
+    return;
+  }
+  el.innerHTML=quotes.map(q=>{
+    const isNew=q.status==='new';
+    const isDone=q.status==='done';
+    const dt=q.createdAt?.seconds?new Date(q.createdAt.seconds*1000).toLocaleDateString('tr-TR',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'';
+    return`<div style="background:var(--card);border:.5px solid ${isNew?'var(--border2)':'var(--border)'};border-radius:var(--r);padding:14px;${isNew?'box-shadow:0 0 0 1px rgba(59,130,246,.15);':'opacity:.75'}">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;">
+        <div>
+          <div style="font-size:15px;font-weight:700;">${q.name||'—'}${isNew?'<span style="background:var(--red);color:#fff;font-size:8px;padding:2px 6px;border-radius:4px;margin-left:6px;vertical-align:middle;">YENİ</span>':''}</div>
+          <div style="font-size:11px;color:var(--text2);margin-top:2px;">${dt}</div>
+        </div>
+        ${typeBadge(q.type||'Diğer')}
+      </div>
+      ${q.phone?`<div style="font-size:13px;margin-bottom:6px;">📞 <a href="tel:${q.phone}" style="color:var(--blue);text-decoration:none;font-weight:600;">${q.phone}</a></div>`:''}
+      ${q.message?`<div style="font-size:12px;color:var(--text2);background:var(--bg3);border-radius:8px;padding:8px 10px;margin-bottom:10px;">${q.message}</div>`:''}
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button onclick="convertToJob(${JSON.stringify(q).replace(/"/g,'&quot;')})" style="background:var(--blue2);border:.5px solid var(--border2);color:var(--blue);padding:7px 12px;border-radius:8px;font-size:11px;font-weight:700;cursor:pointer;letter-spacing:.04em;">📋 İşe Dönüştür</button>
+        ${q.phone?`<a href="tel:${q.phone}" style="background:var(--green2);border:.5px solid rgba(34,197,94,.3);color:var(--green);padding:7px 12px;border-radius:8px;font-size:11px;font-weight:700;text-decoration:none;">📞 Ara</a>`:''}
+        ${isNew?`<button onclick="markQuoteRead('${q.id}')" style="background:var(--bg3);border:.5px solid var(--border);color:var(--text2);padding:7px 12px;border-radius:8px;font-size:11px;cursor:pointer;">✓ Okundu</button>`:''}
+        ${isDone?'':`<button onclick="markQuoteDone('${q.id}')" style="background:var(--green2);border:.5px solid rgba(34,197,94,.3);color:var(--green);padding:7px 12px;border-radius:8px;font-size:11px;cursor:pointer;">✓ Tamamlandı</button>`}
+        <button onclick="deleteQuote('${q.id}')" style="background:var(--red2);border:.5px solid rgba(239,68,68,.3);color:var(--red);padding:7px 12px;border-radius:8px;font-size:11px;cursor:pointer;">Sil</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
 /* ══ DATA ══ */
 const SK_JOBS='ng_jobs', SK_CUSTS='ng_custs';
 let jobs=[], custs=[];
@@ -476,6 +583,8 @@ loadData();
 document.getElementById('hdr-date').textContent=NOW.getDate()+' '+MS[NOW.getMonth()];
 document.getElementById('f-jdate').value=today();
 refreshAll();
+// Firebase'i arka planda başlat
+setTimeout(()=>initFB(),1000);
 
 /* ══ TABS ══ */
 function goTab(tab){
@@ -487,6 +596,7 @@ function goTab(tab){
   if(tab==='custs') renderCusts();
   if(tab==='gelir') renderGelir();
   if(tab==='ozet') renderOzet();
+  if(tab==='quotes'){initFB();renderQuotes();}
 }
 
 function refreshAll(){

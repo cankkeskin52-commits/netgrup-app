@@ -1,4 +1,4 @@
-const CACHE = 'ng-v1';
+const CACHE = 'ng-v2';
 const CORE = ['/netgrup-app/', '/netgrup-app/index.html'];
 
 self.addEventListener('install', e => {
