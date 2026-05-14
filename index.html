@@ -15,13 +15,19 @@ if('serviceWorker' in navigator){
   window.addEventListener('load',()=>{
     navigator.serviceWorker.register('/netgrup-app/sw.js',{scope:'/netgrup-app/'})
       .then(r=>{
+        // Yeni SW yüklenince otomatik güncelle
         r.addEventListener('updatefound',()=>{
           const w=r.installing;
           w.addEventListener('statechange',()=>{
-            if(w.state==='installed'&&navigator.serviceWorker.controller) window.location.reload();
+            if(w.state==='installed'&&navigator.serviceWorker.controller){
+              window.location.reload();
+            }
           });
         });
+        // Periyodik güncelleme kontrolü (her 60 sn)
+        setInterval(()=>r.update(), 60000);
       });
+    // Controller değişince (yeni SW devreye girince) yenile
     navigator.serviceWorker.addEventListener('controllerchange',()=>window.location.reload());
   });
 }

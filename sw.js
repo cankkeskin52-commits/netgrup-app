@@ -1,4 +1,4 @@
-const CACHE = 'ng-v3';
+const CACHE = 'ng-v5';
 const CORE = ['/netgrup-app/', '/netgrup-app/index.html'];
 
 self.addEventListener('install', e => {
@@ -44,7 +44,6 @@ self.addEventListener('notificationclick', e => {
   );
 });
 
-// App'ten mesaj gelince bildirim göster
 self.addEventListener('message', e => {
   if (e.data?.type === 'SHOW_NOTIF') {
     const { title, body } = e.data;
@@ -59,14 +58,19 @@ self.addEventListener('message', e => {
   }
 });
 
+// Network-first: her zaman güncel sürümü çek, internet yoksa cache'den sun
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
   if (!e.request.url.includes('/netgrup-app')) return;
   e.respondWith(
-    fetch(e.request).then(r => {
-      const clone = r.clone();
-      caches.open(CACHE).then(c => c.put(e.request, clone));
-      return r;
-    }).catch(() => caches.match(e.request))
+    fetch(e.request)
+      .then(r => {
+        if (r && r.status === 200) {
+          const clone = r.clone();
+          caches.open(CACHE).then(c => c.put(e.request, clone));
+        }
+        return r;
+      })
+      .catch(() => caches.match(e.request))
   );
 });
