@@ -987,20 +987,34 @@ const sheetStack = [];
 function openSheet(id) {
   const el = document.getElementById(id);
   const ov = document.getElementById('overlay');
+  // Each new sheet gets a higher z-index so it always appears on top
+  el.style.zIndex = 101 + sheetStack.length;
   el.classList.add('open');
+  ov.style.zIndex = 100 + sheetStack.length;
   ov.classList.add('open');
   if(!sheetStack.includes(id)) sheetStack.push(id);
 }
 function closeSheet(id) {
-  document.getElementById(id).classList.remove('open');
+  const el = document.getElementById(id);
+  el.classList.remove('open');
+  el.style.zIndex = '';
   const idx = sheetStack.indexOf(id);
   if(idx>-1) sheetStack.splice(idx,1);
-  if(sheetStack.length===0) document.getElementById('overlay').classList.remove('open');
+  if(sheetStack.length===0){
+    const ov = document.getElementById('overlay');
+    ov.classList.remove('open');
+    ov.style.zIndex = '';
+  } else {
+    // restore overlay z-index to sit just below topmost sheet
+    document.getElementById('overlay').style.zIndex = 100 + sheetStack.length - 1;
+  }
 }
 function closeAllSheets() {
-  document.querySelectorAll('.sheet.open').forEach(s=>s.classList.remove('open'));
+  document.querySelectorAll('.sheet.open').forEach(s=>{s.classList.remove('open');s.style.zIndex='';});
   sheetStack.length=0;
-  document.getElementById('overlay').classList.remove('open');
+  const ov = document.getElementById('overlay');
+  ov.classList.remove('open');
+  ov.style.zIndex='';
 }
 
 // ─── PANEL ────────────────────────────────────────────────────────────────────
