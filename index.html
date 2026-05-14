@@ -568,7 +568,7 @@ textarea.form-input{resize:none;min-height:70px;}
     <div class="tab-pane hidden" id="tab-finans">
       <div class="sub-tabs">
         <div class="sub-tab active" data-fin="gelir" onclick="switchFinTab(this)">💰 Gelir</div>
-        <div class="sub-tab" data-fin="gider" onclick="switchFinTab(this)">🚗 Giderler</div>
+        <div class="sub-tab" data-fin="gider" onclick="switchFinTab(this)">💸 Giderler</div>
       </div>
       <div id="fin-gelir-content"></div>
       <div id="fin-gider-content" class="hidden"></div>
@@ -817,11 +817,23 @@ textarea.form-input{resize:none;min-height:70px;}
     <input type="hidden" id="ef-id">
     <div class="form-group">
       <label class="form-label">Gider Türü *</label>
-      <select class="form-input" id="ef-type" onchange="toggleKmField()">
-        <option value="benzin">⛽ Benzin</option>
-        <option value="bakım">🔧 Bakım</option>
-        <option value="sigorta">📋 Sigorta</option>
-        <option value="diğer">📝 Diğer</option>
+      <select class="form-input" id="ef-type" onchange="toggleExpFields()">
+        <optgroup label="🚗 Araç Giderleri">
+          <option value="benzin">⛽ Benzin</option>
+          <option value="bakım">🔧 Araç Bakım / Tamir</option>
+          <option value="sigorta">📋 Araç Sigortası</option>
+          <option value="muayene">🔍 Araç Muayenesi</option>
+        </optgroup>
+        <optgroup label="🏢 Genel Giderler">
+          <option value="kira">🏢 Kira</option>
+          <option value="fatura">💡 Fatura (Elektrik/Su/Gaz)</option>
+          <option value="personel">👷 Personel / Maaş</option>
+          <option value="malzeme">🧪 Malzeme / Ekipman</option>
+          <option value="telefon">📱 Telefon / İletişim</option>
+          <option value="reklam">📣 Reklam / Pazarlama</option>
+          <option value="vergi">🏛️ Vergi / SGK</option>
+          <option value="diğer">📝 Diğer</option>
+        </optgroup>
       </select>
     </div>
     <div class="form-row">
@@ -838,13 +850,15 @@ textarea.form-input{resize:none;min-height:70px;}
       <label class="form-label">Açıklama</label>
       <input class="form-input" id="ef-desc" type="text" placeholder="Açıklama">
     </div>
-    <div class="form-group">
-      <label class="form-label">Araç / Plaka</label>
-      <input class="form-input" id="ef-vehicle" type="text" placeholder="34 XX 0000">
-    </div>
-    <div class="form-group" id="ef-km-wrap">
-      <label class="form-label">Kilometre</label>
-      <input class="form-input" id="ef-km" type="number" placeholder="0" min="0">
+    <div id="ef-vehicle-wrap">
+      <div class="form-group">
+        <label class="form-label">Araç / Plaka</label>
+        <input class="form-input" id="ef-vehicle" type="text" placeholder="34 XX 0000">
+      </div>
+      <div class="form-group" id="ef-km-wrap">
+        <label class="form-label">Kilometre</label>
+        <input class="form-input" id="ef-km" type="number" placeholder="0" min="0">
+      </div>
     </div>
   </div>
   <div class="sheet-foot">
@@ -1137,6 +1151,12 @@ function catAvatar(cat) {
   const map = {ilaclama:'rgba(59,130,246,.2)',temizlik:'rgba(34,197,94,.2)',nakliye:'rgba(245,158,11,.2)'};
   return map[cat]||'rgba(167,139,250,.2)';
 }
+const EXP_ICONS = {benzin:'⛽',bakım:'🔧',sigorta:'📋',muayene:'🔍',kira:'🏢',fatura:'💡',personel:'👷',malzeme:'🧪',telefon:'📱',reklam:'📣',vergi:'🏛️',diğer:'📝'};
+const EXP_COLORS = {benzin:'var(--orange)',bakım:'var(--blue)',sigorta:'var(--purple)',muayene:'var(--cyan)',kira:'var(--amber)',fatura:'var(--emerald)',personel:'var(--blue)',malzeme:'var(--cyan)',telefon:'var(--purple)',reklam:'var(--orange)',vergi:'var(--red)',diğer:'var(--text2)'};
+function typeIcon(t){ return EXP_ICONS[t]||'📝'; }
+function typeColor(t){ return EXP_COLORS[t]||'var(--text2)'; }
+function expLabel(t){ const map={benzin:'Benzin',bakım:'Araç Bakım',sigorta:'Araç Sigortası',muayene:'Araç Muayenesi',kira:'Kira',fatura:'Fatura',personel:'Personel',malzeme:'Malzeme',telefon:'Telefon',reklam:'Reklam',vergi:'Vergi/SGK',diğer:'Diğer'}; return map[t]||t; }
+
 function catEmoji(cat) {
   if(cat==='ilaclama') return '🦟';
   if(cat==='temizlik') return '🧹';
@@ -1664,9 +1684,12 @@ function deleteJob(id) {
 }
 
 // ─── EXPENSE FORM ─────────────────────────────────────────────────────────────
-function toggleKmField() {
+const VEHICLE_TYPES = ['benzin','bakım','sigorta','muayene'];
+function toggleExpFields() {
   const type = document.getElementById('ef-type').value;
-  document.getElementById('ef-km-wrap').style.display = type==='benzin'?'block':'none';
+  const isVehicle = VEHICLE_TYPES.includes(type);
+  document.getElementById('ef-vehicle-wrap').style.display = isVehicle ? 'block' : 'none';
+  document.getElementById('ef-km-wrap').style.display = type==='benzin' ? 'block' : 'none';
 }
 function openExpenseForm(editId) {
   document.getElementById('ef-id').value=editId||'';
@@ -1688,7 +1711,7 @@ function openExpenseForm(editId) {
     document.getElementById('ef-vehicle').value='';
     document.getElementById('ef-km').value='';
   }
-  toggleKmField();
+  toggleExpFields();
   openSheet('sheet-exp-form');
 }
 async function saveExpense() {
@@ -1843,11 +1866,19 @@ function renderGider() {
   const ms = String(finMonth+1).padStart(2,'0');
   const prefix = `${finYear}-${ms}`;
   const monthExp = expenses.filter(e=>e.date&&e.date.startsWith(prefix)).sort((a,b)=>b.date?.localeCompare(a.date)||0);
-  const cats = {benzin:0,bakım:0,sigorta:0,diğer:0};
-  monthExp.forEach(e=>{const k=e.type in cats?e.type:'diğer';cats[k]+=Number(e.amount||0);});
+  // Group into: araç, personel, kira/fatura, diğer
+  const cats = {araç:0,personel:0,'kira/fatura':0,malzeme:0,diğer:0};
+  monthExp.forEach(e=>{
+    const t = e.type||'diğer';
+    if(['benzin','bakım','sigorta','muayene'].includes(t)) cats['araç']+=Number(e.amount||0);
+    else if(t==='personel') cats['personel']+=Number(e.amount||0);
+    else if(['kira','fatura'].includes(t)) cats['kira/fatura']+=Number(e.amount||0);
+    else if(t==='malzeme') cats['malzeme']+=Number(e.amount||0);
+    else cats['diğer']+=Number(e.amount||0);
+  });
   const total = Object.values(cats).reduce((a,b)=>a+b,0);
-  const expIcons = {benzin:'⛽',bakım:'🔧',sigorta:'📋',diğer:'📝'};
-  const expColors = {benzin:'var(--orange)',bakım:'var(--blue)',sigorta:'var(--purple)',diğer:'var(--text2)'};
+  const expIcons = {araç:'🚗',personel:'👷','kira/fatura':'🏢',malzeme:'🧪',diğer:'📝'};
+  const expColors = {araç:'var(--orange)',personel:'var(--blue)','kira/fatura':'var(--purple)',malzeme:'var(--cyan)',diğer:'var(--text2)'};
 
   // Calc gelir for profit
   const jobs = getJobs();
@@ -1873,9 +1904,9 @@ function renderGider() {
     </div>
     ${monthExp.length===0?'<div class="empty"><span class="empty-icon">🔧</span><span class="empty-text">Bu ay için gider yok</span></div>':
     monthExp.map(e=>`<div class="exp-card">
-      <div class="exp-icon" style="background:${expColors[e.type]||'var(--bg3)'}22;">${expIcons[e.type]||'📝'}</div>
+      <div class="exp-icon" style="background:${typeColor(e.type)}22;">${typeIcon(e.type)}</div>
       <div class="exp-info">
-        <div class="exp-label">${e.type.charAt(0).toUpperCase()+e.type.slice(1)}</div>
+        <div class="exp-label">${expLabel(e.type)}</div>
         <div class="exp-desc">${e.description||e.vehicle||fDate(e.date)}</div>
       </div>
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">
