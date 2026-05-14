@@ -459,6 +459,29 @@ const FB_PID='clensmedya-a08a5';
 let fbDb=null,fbReady=false;
 let quotes=[];
 
+/* ══ BİLDİRİM ══ */
+async function requestNotifPermission(){
+  if(!('Notification' in window)) return false;
+  if(Notification.permission==='granted') return true;
+  if(Notification.permission==='denied') return false;
+  const p = await Notification.requestPermission();
+  return p === 'granted';
+}
+
+async function sendNotif(title, body){
+  if(Notification.permission !== 'granted') return;
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    reg.active?.postMessage({ type:'SHOW_NOTIF', title, body });
+  } catch(e) {
+    // fallback
+    new Notification(title, { body, icon: '/netgrup-app/icon.svg' });
+  }
+}
+
+let knownQuoteIds = new Set();
+let firstLoad = true;
+
 async function initFB(){
   if(fbReady)return true;
   try{
@@ -477,7 +500,28 @@ async function initFB(){
 function listenQuotes(){
   if(!fbDb)return;
   fbDb.collection('ng_quotes').orderBy('createdAt','desc').onSnapshot(snap=>{
-    quotes=snap.docs.map(d=>({id:d.id,...d.data()}));
+    const newQuotes = snap.docs.map(d=>({id:d.id,...d.data()}));
+
+    // İlk yüklemede mevcut ID'leri kaydet, bildirim gösterme
+    if(firstLoad){
+      newQuotes.forEach(q => knownQuoteIds.add(q.id));
+      firstLoad = false;
+    } else {
+      // Yeni gelen talepleri bul
+      newQuotes.forEach(q => {
+        if(!knownQuoteIds.has(q.id) && q.status === 'new'){
+          knownQuoteIds.add(q.id);
+          const type = q.type || 'Hizmet';
+          sendNotif(
+            '🔔 Yeni Teklif Talebi!',
+            `${q.name} — ${type} talebi geldi. Telefon: ${q.phone||'belirtilmedi'}`
+          );
+          if(navigator.vibrate) navigator.vibrate([200,100,200,100,200]);
+        }
+      });
+    }
+
+    quotes = newQuotes;
     renderQuotes();
     updateQuotesBadge();
   });
@@ -583,6 +627,8 @@ loadData();
 document.getElementById('hdr-date').textContent=NOW.getDate()+' '+MS[NOW.getMonth()];
 document.getElementById('f-jdate').value=today();
 refreshAll();
+// Bildirim iznini iste
+requestNotifPermission();
 // Firebase'i arka planda başlat
 setTimeout(()=>initFB(),1000);
 
