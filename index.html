@@ -1070,13 +1070,15 @@ function startApp() {
   switchTab('panel');
   setTimeout(requestNotifPermission, 2000);
 
-  // Setup swipe-to-close
-  let touchStartY = 0;
+  // Setup swipe-to-close — sadece sheet-handle'dan aşağı kaydırınca kapat
   document.querySelectorAll('.sheet').forEach(sheet=>{
-    sheet.addEventListener('touchstart', e=>{ touchStartY = e.touches[0].clientY; }, {passive:true});
-    sheet.addEventListener('touchmove', e=>{
-      const dy = e.touches[0].clientY - touchStartY;
-      if(dy > 80) { closeAllSheets(); }
+    const handle = sheet.querySelector('.sheet-handle');
+    if(!handle) return;
+    let startY = 0;
+    handle.addEventListener('touchstart', e=>{ startY = e.touches[0].clientY; }, {passive:true});
+    handle.addEventListener('touchmove', e=>{
+      const dy = e.touches[0].clientY - startY;
+      if(dy > 60) { closeAllSheets(); }
     }, {passive:true});
   });
 
