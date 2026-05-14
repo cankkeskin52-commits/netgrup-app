@@ -1,5 +1,34 @@
-const CACHE = 'ng-v5';
+importScripts('https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js');
+importScripts('https://www.gstatic.com/firebasejs/9.23.0/firebase-messaging-compat.js');
+
+const CACHE = 'ng-v6';
 const CORE = ['/netgrup-app/', '/netgrup-app/index.html'];
+
+// Firebase init (FCM background messages için)
+firebase.initializeApp({
+  apiKey: 'AIzaSyAeYOc5tufXdy2DVt1Fdxmq3j1PP4-vpeE',
+  authDomain: 'clensmedya-a08a5.firebaseapp.com',
+  projectId: 'clensmedya-a08a5',
+  messagingSenderId: 'SENDER_ID_BURAYA',
+  appId: 'APP_ID_BURAYA'
+});
+
+const messaging = firebase.messaging();
+
+// Uygulama kapalıyken FCM push gelince bildirim göster
+messaging.onBackgroundMessage(payload => {
+  const title = payload.notification?.title || '🔔 Yeni Teklif!';
+  const body  = payload.notification?.body  || 'Net Grup sitesinden yeni bir teklif talebi geldi.';
+  self.registration.showNotification(title, {
+    body,
+    icon: '/netgrup-app/icon.svg',
+    badge: '/netgrup-app/icon.svg',
+    vibrate: [200, 100, 200],
+    tag: 'ng-quote',
+    renotify: true,
+    data: { url: '/netgrup-app/' }
+  });
+});
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(CORE)));
@@ -11,23 +40,6 @@ self.addEventListener('activate', e => {
     caches.keys().then(keys =>
       Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
     ).then(() => clients.claim())
-  );
-});
-
-self.addEventListener('push', e => {
-  const data = e.data ? e.data.json() : {};
-  const title = data.title || '🔔 Yeni Teklif Talebi!';
-  const body = data.body || 'Net Grup sitesinden yeni bir teklif talebi geldi.';
-  e.waitUntil(
-    self.registration.showNotification(title, {
-      body,
-      icon: '/netgrup-app/icon.svg',
-      badge: '/netgrup-app/icon.svg',
-      vibrate: [200, 100, 200],
-      tag: 'ng-quote',
-      renotify: true,
-      data: { url: '/netgrup-app/' }
-    })
   );
 });
 
@@ -44,6 +56,7 @@ self.addEventListener('notificationclick', e => {
   );
 });
 
+// App'ten mesaj gelince bildirim göster (uygulama açıkken)
 self.addEventListener('message', e => {
   if (e.data?.type === 'SHOW_NOTIF') {
     const { title, body } = e.data;
@@ -58,7 +71,7 @@ self.addEventListener('message', e => {
   }
 });
 
-// Network-first: her zaman güncel sürümü çek, internet yoksa cache'den sun
+// Network-first fetch
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
   if (!e.request.url.includes('/netgrup-app')) return;

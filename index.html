@@ -2014,6 +2014,7 @@ function openQuoteDetail(id) {
     ${q.address?`<div class="detail-row"><span class="detail-lbl">Adres</span><span class="detail-val">${q.address}</span></div>`:''}
     <div class="action-row">
       ${q.phone?`<div class="action-btn" onclick="window.location='tel:${q.phone}'"><span>📞</span><span>Ara</span></div>`:''}
+      ${q.phone?`<div class="action-btn" onclick="openWhatsApp('${q.phone}','${(q.name||'').replace(/'/g,'&#39;')}','${q.type||''}','${(q.district||'').replace(/'/g,'&#39;')}')"><span style="color:#25D366">💬</span><span>WhatsApp</span></div>`:''}
       <div class="action-btn" onclick="convertQuoteToJob('${q.id}')"><span>🛠️</span><span>İşe Dönüştür</span></div>
     </div>
     <div class="divider"></div>
@@ -2027,6 +2028,14 @@ function openQuoteDetail(id) {
   `;
   document.getElementById('quote-detail-foot').innerHTML = '';
   openSheet('sheet-quote-detail');
+}
+
+function openWhatsApp(phone, name, type, district) {
+  const clean = phone.replace(/\D/g,'').replace(/^0/,'90');
+  const svc = {ilaclama:'ilaçlama', temizlik:'temizlik', nakliye:'nakliye & lojistik'}[type] || type || 'hizmet';
+  const loc = district ? ` (${district})` : '';
+  const msg = `Merhaba ${name}!👋\n\nNet Grup olarak ${svc}${loc} talebinizi aldık.\n\nSizi en kısa sürede bilgilendireceğiz. Size uygun gün ve saati öğrenebilir miyiz?\n\nSaygılarımızla,\nNet Grup Ekibi 🏢`;
+  window.open(`https://wa.me/${clean}?text=${encodeURIComponent(msg)}`, '_blank');
 }
 
 function updateQuoteStatus(id, status) {
@@ -2061,10 +2070,25 @@ function convertQuoteToJob(id) {
 }
 
 // ─── NOTIFICATIONS ────────────────────────────────────────────────────────────
+const VAPID_KEY = 'VAPID_KEY_BURAYA'; // Firebase Console > Project Settings > Cloud Messaging > Web Push certificates
+
 async function requestNotifPermission() {
-  if('Notification' in window && Notification.permission==='default'){
-    await Notification.requestPermission();
-  }
+  if(!('Notification' in window)) return;
+  if(Notification.permission==='denied') return;
+  const perm = await Notification.requestPermission();
+  if(perm === 'granted') registerFCMToken();
+}
+
+async function registerFCMToken() {
+  try {
+    if(!firebase.messaging) return;
+    const reg = await navigator.serviceWorker.ready;
+    const msg = firebase.messaging();
+    const token = await msg.getToken({ vapidKey: VAPID_KEY, serviceWorkerRegistration: reg });
+    if(token && db && uid) {
+      await db.collection('ng_push_tokens').doc(uid).set({ token, updatedAt: serverTS() });
+    }
+  } catch(e) { /* FCM token alınamadı, sorun değil */ }
 }
 async function sendNotif(title, body) {
   try {
