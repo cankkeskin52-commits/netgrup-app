@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <rect width="100" height="100" rx="22" fill="#060d1f"/>
+  <text x="50" y="38" font-family="Arial,sans-serif" font-size="11" font-weight="800" fill="#3b82f6" text-anchor="middle" letter-spacing="1">NET</text>
+  <text x="50" y="52" font-family="Arial,sans-serif" font-size="11" font-weight="800" fill="#ffffff" text-anchor="middle" letter-spacing="1">GRUP</text>
+  <line x1="22" y1="57" x2="78" y2="57" stroke="#3b82f6" stroke-width="1.5"/>
+  <text x="50" y="70" font-family="Arial,sans-serif" font-size="7" fill="#6b7280" text-anchor="middle" letter-spacing="0.5">TAKİP</text>
+</svg>

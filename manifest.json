@@ -1,0 +1,13 @@
+{
+  "name": "Net Grup Takip",
+  "short_name": "Net Grup",
+  "description": "İlaçlama, Temizlik ve Lojistik iş takibi",
+  "start_url": "/netgrup-app/",
+  "display": "standalone",
+  "background_color": "#060d1f",
+  "theme_color": "#060d1f",
+  "orientation": "portrait",
+  "icons": [
+    {"src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable"}
+  ]
+}

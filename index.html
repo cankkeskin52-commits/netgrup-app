@@ -1,0 +1,914 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Net Grup">
+<meta name="theme-color" content="#060d1f">
+<link rel="manifest" href="/netgrup-app/manifest.json">
+<link rel="apple-touch-icon" href="/netgrup-app/icon.svg">
+<title>Net Grup · Takip</title>
+<script>
+if('serviceWorker' in navigator){
+  window.addEventListener('load',()=>{
+    navigator.serviceWorker.register('/netgrup-app/sw.js',{scope:'/netgrup-app/'})
+      .then(r=>{
+        r.addEventListener('updatefound',()=>{
+          const w=r.installing;
+          w.addEventListener('statechange',()=>{
+            if(w.state==='installed'&&navigator.serviceWorker.controller) window.location.reload();
+          });
+        });
+      });
+    navigator.serviceWorker.addEventListener('controllerchange',()=>window.location.reload());
+  });
+}
+</script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+:root{
+  --bg:#060d1f; --bg2:#0c1631; --bg3:#111e40; --card:#0a1428;
+  --border:rgba(59,130,246,0.1); --border2:rgba(59,130,246,0.22);
+  --blue:#3b82f6; --blue2:rgba(59,130,246,0.12);
+  --green:#22c55e; --green2:rgba(34,197,94,0.1);
+  --orange:#f59e0b; --orange2:rgba(245,158,11,0.1);
+  --red:#ef4444; --red2:rgba(239,68,68,0.1);
+  --purple:#a78bfa; --purple2:rgba(167,139,250,0.1);
+  --text:#dde6f5; --text2:#5a7a9e; --text3:#2a3f5e;
+  --st:env(safe-area-inset-top,0px); --sb:env(safe-area-inset-bottom,0px);
+  --r:14px;
+}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-system,'SF Pro Display',Helvetica,sans-serif;overflow:hidden;font-size:15px;}
+#app{display:flex;flex-direction:column;height:100dvh;}
+
+/* ── HEADER ── */
+.hdr{padding:max(calc(var(--st)+14px),54px) 18px 12px;background:rgba(6,13,31,.96);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border-bottom:.5px solid var(--border);display:flex;align-items:center;justify-content:space-between;z-index:20;}
+.hdr-brand{display:flex;flex-direction:column;}
+.hdr-title{font-size:17px;font-weight:800;letter-spacing:-.3px;color:var(--blue);}
+.hdr-sub{font-size:9px;color:var(--text2);letter-spacing:.18em;text-transform:uppercase;margin-top:1px;}
+.hdr-right{display:flex;align-items:center;gap:10px;}
+.hdr-add{width:36px;height:36px;border-radius:50%;background:var(--blue);color:#fff;font-size:22px;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 0 16px rgba(59,130,246,.4);}
+.hdr-date{font-size:10px;color:var(--text2);letter-spacing:.04em;}
+
+/* ── BOTTOM NAV ── */
+.bnav{display:grid;grid-template-columns:repeat(5,1fr);background:rgba(6,13,31,.97);border-top:.5px solid var(--border);}
+.bnav-item{display:flex;flex-direction:column;align-items:center;gap:2px;padding:9px 0 calc(7px + var(--sb));cursor:pointer;}
+.bnav-icon{font-size:18px;}
+.bnav-label{font-size:8px;color:var(--text2);transition:color .2s;}
+.bnav-item.active .bnav-label{color:var(--blue);}
+.bnav-item.active .bnav-icon{filter:drop-shadow(0 0 5px var(--blue));}
+
+/* ── PAGES ── */
+.page{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;display:none;padding-bottom:16px;}
+.page.active{display:block;}
+
+/* ── DASHBOARD ── */
+.dash-top{padding:14px 14px 0;}
+.today-card{background:linear-gradient(135deg,rgba(59,130,246,.15),rgba(59,130,246,.05));border:.5px solid var(--border2);border-radius:var(--r);padding:16px;margin-bottom:14px;}
+.today-lbl{font-size:9px;letter-spacing:.15em;text-transform:uppercase;color:var(--blue);margin-bottom:8px;}
+.today-jobs{display:flex;gap:8px;flex-wrap:wrap;}
+.today-chip{background:var(--bg3);border:.5px solid var(--border);border-radius:20px;padding:5px 12px;font-size:11px;font-weight:600;display:flex;align-items:center;gap:5px;}
+.dash-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:0 14px 14px;}
+.dc{background:var(--card);border:.5px solid var(--border);border-radius:var(--r);padding:14px;position:relative;overflow:hidden;}
+.dc::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at 0 0,var(--ac,transparent),transparent 65%);pointer-events:none;}
+.dc.c-blue{--ac:rgba(59,130,246,.08);}
+.dc.c-green{--ac:rgba(34,197,94,.08);}
+.dc.c-orange{--ac:rgba(245,158,11,.08);}
+.dc.c-red{--ac:rgba(239,68,68,.08);}
+.dc.c-purple{--ac:rgba(167,139,250,.08);}
+.dc.wide{grid-column:1/-1;}
+.dc-ico{font-size:20px;margin-bottom:6px;}
+.dc-lbl{font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--text2);margin-bottom:4px;}
+.dc-val{font-size:26px;font-weight:800;letter-spacing:-.5px;}
+.dc-val.blue{color:var(--blue);}
+.dc-val.green{color:var(--green);}
+.dc-val.orange{color:var(--orange);}
+.dc-val.red{color:var(--red);}
+.dc-val.purple{color:var(--purple);}
+.dc-sub{font-size:10px;color:var(--text3);margin-top:2px;}
+
+/* ── JOB TYPE BADGES ── */
+.badge-ilac{background:rgba(239,68,68,.12);color:var(--red);border:.5px solid rgba(239,68,68,.3);}
+.badge-temiz{background:rgba(34,197,94,.12);color:var(--green);border:.5px solid rgba(34,197,94,.3);}
+.badge-lojis{background:rgba(245,158,11,.12);color:var(--orange);border:.5px solid rgba(245,158,11,.3);}
+.badge-diger{background:var(--blue2);color:var(--blue);border:.5px solid var(--border2);}
+
+/* ── STATUS ── */
+.st-planned{background:var(--blue2);color:var(--blue);border:.5px solid var(--border2);}
+.st-done{background:var(--green2);color:var(--green);border:.5px solid rgba(34,197,94,.3);}
+.st-cancelled{background:var(--red2);color:var(--red);border:.5px solid rgba(239,68,68,.3);}
+.st-pending{background:var(--orange2);color:var(--orange);border:.5px solid rgba(245,158,11,.3);}
+
+/* ── SECTION ── */
+.sec-lbl{font-size:9px;letter-spacing:.15em;text-transform:uppercase;color:var(--text3);padding:14px 14px 8px;}
+.list-wrap{display:flex;flex-direction:column;gap:8px;padding:0 14px;}
+
+/* ── JOB CARD ── */
+.job-card{background:var(--card);border:.5px solid var(--border);border-radius:var(--r);padding:14px;cursor:pointer;transition:border-color .2s;}
+.job-card:active{border-color:var(--border2);}
+.job-top{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:8px;}
+.job-name{font-size:15px;font-weight:700;flex:1;}
+.job-badge{font-size:9px;letter-spacing:.06em;text-transform:uppercase;padding:3px 8px;border-radius:6px;font-weight:700;white-space:nowrap;}
+.job-meta{display:flex;gap:10px;flex-wrap:wrap;}
+.job-meta-item{font-size:11px;color:var(--text2);display:flex;align-items:center;gap:3px;}
+.job-bottom{display:flex;align-items:center;justify-content:space-between;margin-top:10px;}
+.job-price{font-size:16px;font-weight:800;color:var(--blue);}
+.job-status{font-size:9px;letter-spacing:.06em;text-transform:uppercase;padding:4px 10px;border-radius:20px;font-weight:700;}
+
+/* ── CUSTOMER CARD ── */
+.cust-card{background:var(--card);border:.5px solid var(--border);border-radius:var(--r);padding:14px;cursor:pointer;}
+.cust-top{display:flex;align-items:center;gap:12px;}
+.cust-avatar{width:44px;height:44px;border-radius:50%;background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;border:.5px solid var(--border2);}
+.cust-info{flex:1;}
+.cust-name{font-size:15px;font-weight:700;}
+.cust-phone{font-size:11px;color:var(--text2);margin-top:2px;}
+.cust-stats{display:flex;gap:8px;margin-top:8px;}
+.cust-stat{font-size:10px;color:var(--text2);background:var(--bg3);border-radius:6px;padding:3px 8px;}
+
+/* ── MODAL ── */
+.ov{position:fixed;inset:0;background:rgba(6,13,31,.85);z-index:50;display:none;align-items:flex-end;}
+.ov.open{display:flex;}
+.modal{background:var(--bg2);border-radius:20px 20px 0 0;width:100%;max-height:92vh;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:calc(var(--sb)+20px);}
+.modal-handle{width:34px;height:4px;background:var(--border2);border-radius:2px;margin:12px auto 0;}
+.modal-hdr{padding:14px 18px 12px;display:flex;align-items:center;justify-content:space-between;border-bottom:.5px solid var(--border);}
+.modal-title{font-size:16px;font-weight:700;}
+.modal-close{color:var(--text2);font-size:22px;cursor:pointer;width:32px;height:32px;display:flex;align-items:center;justify-content:center;}
+.modal-body{padding:16px 18px;}
+.fg{display:flex;flex-direction:column;gap:5px;margin-bottom:12px;}
+.fg label{font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--text2);}
+.fi{background:var(--bg);border:.5px solid var(--border2);border-radius:10px;padding:12px 13px;font-size:15px;color:var(--text);outline:none;width:100%;}
+.fi:focus{border-color:var(--blue);}
+.fi option{background:var(--bg2);}
+.fr{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.btn-p{width:100%;background:linear-gradient(135deg,rgba(59,130,246,.25),rgba(59,130,246,.12));border:.5px solid var(--blue);border-radius:12px;padding:14px;font-size:13px;font-weight:700;color:var(--blue);letter-spacing:.1em;text-transform:uppercase;cursor:pointer;margin-top:4px;}
+.btn-p:disabled{opacity:.5;}
+.btn-danger{width:100%;background:var(--red2);border:.5px solid rgba(239,68,68,.3);border-radius:12px;padding:12px;font-size:12px;font-weight:700;color:var(--red);letter-spacing:.08em;text-transform:uppercase;cursor:pointer;margin-top:8px;}
+
+/* ── ST SELECTOR ── */
+.st-row{display:flex;gap:8px;flex-wrap:wrap;}
+.st-opt{padding:8px 14px;border-radius:20px;font-size:11px;font-weight:700;cursor:pointer;border:.5px solid var(--border2);color:var(--text2);letter-spacing:.04em;}
+.st-opt.sel-planned{background:var(--blue2);color:var(--blue);border-color:var(--border2);}
+.st-opt.sel-done{background:var(--green2);color:var(--green);border-color:rgba(34,197,94,.3);}
+.st-opt.sel-cancelled{background:var(--red2);color:var(--red);border-color:rgba(239,68,68,.3);}
+
+/* ── MONTH BAR ── */
+.month-bar{display:flex;align-items:center;justify-content:space-between;padding:12px 18px 4px;}
+.month-nav{width:32px;height:32px;border-radius:50%;background:var(--bg3);border:.5px solid var(--border2);display:flex;align-items:center;justify-content:center;font-size:18px;color:var(--text2);cursor:pointer;}
+.month-label{font-size:16px;font-weight:700;letter-spacing:-.3px;}
+
+/* ── GELIR ── */
+.fin-sum{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:14px;}
+.fin-card{background:var(--card);border:.5px solid var(--border);border-radius:var(--r);padding:14px;}
+.fin-lbl{font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--text2);margin-bottom:6px;}
+.fin-val{font-size:22px;font-weight:800;}
+.fin-item{background:var(--card);border:.5px solid var(--border);border-radius:12px;padding:12px 14px;display:flex;align-items:center;justify-content:space-between;margin:0 14px 8px;}
+.fin-item-left{flex:1;}
+.fin-item-name{font-size:13px;font-weight:600;}
+.fin-item-meta{font-size:10px;color:var(--text2);margin-top:2px;}
+.fin-item-right{text-align:right;}
+.fin-item-amt{font-size:15px;font-weight:800;}
+.fin-item-status{font-size:9px;padding:2px 8px;border-radius:10px;margin-top:3px;display:inline-block;letter-spacing:.04em;}
+
+/* ── OZET ── */
+.ozet-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;padding:0 14px 14px;}
+.oz-card{background:var(--card);border:.5px solid var(--border);border-radius:12px;padding:12px;text-align:center;}
+.oz-ico{font-size:18px;margin-bottom:4px;}
+.oz-val{font-size:18px;font-weight:800;letter-spacing:-.3px;}
+.oz-lbl{font-size:8.5px;color:var(--text2);margin-top:2px;letter-spacing:.04em;}
+.bar-wrap{padding:0 14px 14px;}
+.bar-item{margin-bottom:12px;}
+.bar-lbl{display:flex;justify-content:space-between;font-size:11px;margin-bottom:5px;}
+.bar-track{background:var(--bg3);border-radius:4px;height:6px;overflow:hidden;}
+.bar-fill{height:100%;border-radius:4px;transition:width .6s cubic-bezier(.32,.72,0,1);}
+
+/* ── TOAST ── */
+#toast-wrap{position:fixed;bottom:calc(var(--sb)+80px);left:50%;transform:translateX(-50%);z-index:9999;display:flex;flex-direction:column;gap:8px;align-items:center;pointer-events:none;}
+.toast{background:rgba(10,20,40,.97);border:.5px solid var(--border2);backdrop-filter:blur(20px);border-radius:14px;padding:11px 18px;font-size:13px;font-weight:600;white-space:nowrap;opacity:0;transform:translateY(12px) scale(.96);transition:all .25s cubic-bezier(.32,.72,0,1);}
+.toast.show{opacity:1;transform:translateY(0) scale(1);}
+.toast.ok{border-color:rgba(34,197,94,.4);color:var(--green);}
+.toast.err{border-color:rgba(239,68,68,.4);color:var(--red);}
+.toast.info{color:var(--text);}
+
+/* ── DETAIL ── */
+.det-sec{background:var(--card);border:.5px solid var(--border);border-radius:var(--r);margin:0 14px 10px;padding:4px 0;}
+.det-row{display:flex;align-items:flex-start;gap:12px;padding:12px 14px;border-bottom:.5px solid var(--border);}
+.det-row:last-child{border-bottom:none;}
+.det-ico{font-size:16px;width:22px;flex-shrink:0;margin-top:1px;}
+.det-k{font-size:9.5px;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:2px;}
+.det-v{font-size:14px;font-weight:600;}
+.det-actions{display:flex;gap:8px;padding:0 14px 14px;}
+.det-btn{flex:1;padding:12px;border-radius:12px;font-size:12px;font-weight:700;text-align:center;cursor:pointer;letter-spacing:.06em;text-transform:uppercase;}
+.det-edit{background:var(--blue2);border:.5px solid var(--border2);color:var(--blue);}
+.det-del{background:var(--red2);border:.5px solid rgba(239,68,68,.3);color:var(--red);}
+
+/* ── EMPTY ── */
+.empty-s{text-align:center;padding:40px 20px;}
+.empty-s .ei{font-size:40px;margin-bottom:10px;}
+.empty-s .et{font-size:13px;color:var(--text2);}
+
+.fmt-price{font-family:-apple-system,sans-serif;}
+</style>
+</head>
+<body>
+<div id="app">
+  <!-- HEADER -->
+  <div class="hdr">
+    <div class="hdr-brand">
+      <div class="hdr-title">NET GRUP</div>
+      <div class="hdr-sub">İlaçlama · Temizlik · Lojistik</div>
+    </div>
+    <div class="hdr-right">
+      <div class="hdr-date" id="hdr-date"></div>
+      <div class="hdr-add" onclick="openAddMenu()">+</div>
+    </div>
+  </div>
+
+  <!-- PANEL -->
+  <div class="page active" id="page-panel">
+    <div class="dash-top">
+      <div class="today-card">
+        <div class="today-lbl">📅 Bugünkü İşler</div>
+        <div class="today-jobs" id="today-jobs"><span style="font-size:12px;color:var(--text2);">Yükleniyor...</span></div>
+      </div>
+    </div>
+    <div class="dash-grid">
+      <div class="dc c-blue">
+        <div class="dc-ico">📋</div>
+        <div class="dc-lbl">Toplam İş</div>
+        <div class="dc-val blue" id="d-total">0</div>
+        <div class="dc-sub">bu ay</div>
+      </div>
+      <div class="dc c-green">
+        <div class="dc-ico">✅</div>
+        <div class="dc-lbl">Tamamlanan</div>
+        <div class="dc-val green" id="d-done">0</div>
+        <div class="dc-sub">bu ay</div>
+      </div>
+      <div class="dc c-orange">
+        <div class="dc-ico">⏳</div>
+        <div class="dc-lbl">Bekleyen</div>
+        <div class="dc-val orange" id="d-pending">0</div>
+        <div class="dc-sub">ödeme</div>
+      </div>
+      <div class="dc c-purple">
+        <div class="dc-ico">👥</div>
+        <div class="dc-lbl">Müşteri</div>
+        <div class="dc-val purple" id="d-custs">0</div>
+        <div class="dc-sub">toplam</div>
+      </div>
+      <div class="dc c-green wide">
+        <div class="dc-ico">💰</div>
+        <div class="dc-lbl">Bu Ay Gelir</div>
+        <div class="dc-val green fmt-price" id="d-income">0 ₺</div>
+        <div class="dc-sub" id="d-income-sub">tahsil edilen</div>
+      </div>
+    </div>
+    <div class="sec-lbl">YAKLAŞAN İŞLER</div>
+    <div class="list-wrap" id="upcoming-list"></div>
+  </div>
+
+  <!-- İŞLER -->
+  <div class="page" id="page-jobs">
+    <div class="month-bar">
+      <div class="month-nav" onclick="changeJobMonth(-1)">‹</div>
+      <div class="month-label" id="job-month-label"></div>
+      <div class="month-nav" onclick="changeJobMonth(1)">›</div>
+    </div>
+    <!-- Filtre -->
+    <div style="display:flex;gap:8px;padding:8px 14px;overflow-x:auto;scrollbar-width:none;">
+      <button class="job-badge badge-ilac" style="cursor:pointer;padding:6px 14px;" onclick="filterJobs('İlaçlama')">🦟 İlaçlama</button>
+      <button class="job-badge badge-temiz" style="cursor:pointer;padding:6px 14px;" onclick="filterJobs('Temizlik')">🧹 Temizlik</button>
+      <button class="job-badge badge-lojis" style="cursor:pointer;padding:6px 14px;" onclick="filterJobs('Lojistik')">🚚 Lojistik</button>
+      <button class="job-badge badge-diger" style="cursor:pointer;padding:6px 14px;" onclick="filterJobs('')">Tümü</button>
+    </div>
+    <div class="list-wrap" id="jobs-list"></div>
+  </div>
+
+  <!-- MÜŞTERİLER -->
+  <div class="page" id="page-custs">
+    <div class="sec-lbl">MÜŞTERİLER</div>
+    <div class="list-wrap" id="custs-list"></div>
+  </div>
+
+  <!-- GELİR -->
+  <div class="page" id="page-gelir">
+    <div class="month-bar">
+      <div class="month-nav" onclick="changeFinMonth(-1)">‹</div>
+      <div class="month-label" id="fin-month-label"></div>
+      <div class="month-nav" onclick="changeFinMonth(1)">›</div>
+    </div>
+    <div class="fin-sum">
+      <div class="fin-card">
+        <div class="fin-lbl">Toplam Gelir</div>
+        <div class="fin-val green fmt-price" id="fin-total">0 ₺</div>
+      </div>
+      <div class="fin-card">
+        <div class="fin-lbl">Tahsil Edilen</div>
+        <div class="fin-val blue fmt-price" id="fin-paid">0 ₺</div>
+      </div>
+      <div class="fin-card">
+        <div class="fin-lbl">Bekleyen</div>
+        <div class="fin-val orange fmt-price" id="fin-pending">0 ₺</div>
+      </div>
+      <div class="fin-card">
+        <div class="fin-lbl">İş Sayısı</div>
+        <div class="fin-val blue" id="fin-count">0</div>
+      </div>
+    </div>
+    <div class="sec-lbl">ÖDEMELER</div>
+    <div id="fin-list"></div>
+  </div>
+
+  <!-- ÖZET -->
+  <div class="page" id="page-ozet">
+    <div class="month-bar">
+      <div class="month-nav" onclick="changeOzetMonth(-1)">‹</div>
+      <div class="month-label" id="ozet-month-label"></div>
+      <div class="month-nav" onclick="changeOzetMonth(1)">›</div>
+    </div>
+    <div class="ozet-grid" id="ozet-grid"></div>
+    <div class="sec-lbl">İŞ TİPİ DAĞILIMI</div>
+    <div class="bar-wrap" id="ozet-bars"></div>
+    <div class="sec-lbl">AYLIK CİRO (Son 6 Ay)</div>
+    <div class="bar-wrap" id="ozet-ciro"></div>
+  </div>
+
+  <!-- BOTTOM NAV -->
+  <div class="bnav">
+    <div class="bnav-item active" data-tab="panel" onclick="goTab('panel')"><div class="bnav-icon">🏠</div><div class="bnav-label">Panel</div></div>
+    <div class="bnav-item" data-tab="jobs" onclick="goTab('jobs')"><div class="bnav-icon">📋</div><div class="bnav-label">İşler</div></div>
+    <div class="bnav-item" data-tab="custs" onclick="goTab('custs')"><div class="bnav-icon">👥</div><div class="bnav-label">Müşteriler</div></div>
+    <div class="bnav-item" data-tab="gelir" onclick="goTab('gelir')"><div class="bnav-icon">💰</div><div class="bnav-label">Gelir</div></div>
+    <div class="bnav-item" data-tab="ozet" onclick="goTab('ozet')"><div class="bnav-icon">📊</div><div class="bnav-label">Özet</div></div>
+  </div>
+</div>
+
+<!-- ADD MENU MODAL -->
+<div class="ov" id="ov-addmenu" onclick="closeOv('ov-addmenu',event)">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-hdr"><div class="modal-title">Ne eklemek istersin?</div><div class="modal-close" onclick="closeOv('ov-addmenu')">✕</div></div>
+    <div class="modal-body" style="display:flex;flex-direction:column;gap:10px;">
+      <div onclick="closeOv('ov-addmenu');setTimeout(()=>openJobModal(),200);" style="background:var(--bg3);border:.5px solid var(--border2);border-radius:14px;padding:14px 16px;display:flex;align-items:center;gap:12px;cursor:pointer;">
+        <div style="font-size:24px;">📋</div>
+        <div><div style="font-size:14px;font-weight:700;">İş Ekle</div><div style="font-size:11px;color:var(--text2);margin-top:2px;">İlaçlama, temizlik veya lojistik işi</div></div>
+      </div>
+      <div onclick="closeOv('ov-addmenu');setTimeout(()=>openCustModal(),200);" style="background:var(--bg3);border:.5px solid var(--border2);border-radius:14px;padding:14px 16px;display:flex;align-items:center;gap:12px;cursor:pointer;">
+        <div style="font-size:24px;">👤</div>
+        <div><div style="font-size:14px;font-weight:700;">Müşteri Ekle</div><div style="font-size:11px;color:var(--text2);margin-top:2px;">Yeni müşteri kaydı oluştur</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- JOB MODAL -->
+<div class="ov" id="ov-job" onclick="closeOv('ov-job',event)">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-hdr"><div class="modal-title" id="job-modal-title">Yeni İş</div><div class="modal-close" onclick="closeOv('ov-job')">✕</div></div>
+    <div class="modal-body">
+      <input type="hidden" id="f-jid">
+      <div class="fg"><label>Müşteri Adı *</label><input class="fi" id="f-jname" type="text" placeholder="Ad Soyad / Firma" autocomplete="off" list="cust-suggestions"><datalist id="cust-suggestions"></datalist></div>
+      <div class="fg"><label>Telefon</label><input class="fi" id="f-jphone" type="tel" placeholder="05xx xxx xx xx" inputmode="tel"></div>
+      <div class="fr">
+        <div class="fg"><label>İş Tipi *</label>
+          <select class="fi" id="f-jtype">
+            <option value="İlaçlama">🦟 İlaçlama</option>
+            <option value="Temizlik">🧹 Temizlik</option>
+            <option value="Lojistik">🚚 Lojistik</option>
+            <option value="Diğer">Diğer</option>
+          </select>
+        </div>
+        <div class="fg"><label>Tarih *</label><input class="fi" id="f-jdate" type="date"></div>
+      </div>
+      <div class="fr">
+        <div class="fg"><label>Saat</label><input class="fi" id="f-jtime" type="time"></div>
+        <div class="fg"><label>Ücret (₺)</label><input class="fi" id="f-jprice" type="number" placeholder="0" inputmode="numeric"></div>
+      </div>
+      <div class="fg"><label>Adres</label><input class="fi" id="f-jaddr" type="text" placeholder="Mahalle, sokak..." autocomplete="off"></div>
+      <div class="fg"><label>Not</label><input class="fi" id="f-jnote" type="text" placeholder="Ekstra bilgi" autocomplete="off"></div>
+      <div class="fg"><label>Durum</label>
+        <div class="st-row">
+          <div class="st-opt sel-planned" data-st="planned" onclick="selJobSt('planned')">Planlandı</div>
+          <div class="st-opt" data-st="done" onclick="selJobSt('done')">Tamamlandı</div>
+          <div class="st-opt" data-st="cancelled" onclick="selJobSt('cancelled')">İptal</div>
+        </div>
+      </div>
+      <div class="fg"><label>Ödeme</label>
+        <div class="st-row">
+          <div class="pay-opt st-opt" data-pay="pending" onclick="selPaySt('pending')" style="background:var(--orange2);color:var(--orange);border-color:rgba(245,158,11,.3);">Bekliyor</div>
+          <div class="pay-opt st-opt" data-pay="paid" onclick="selPaySt('paid')">Ödendi</div>
+        </div>
+      </div>
+      <button class="btn-p" id="job-save-btn" onclick="saveJob()">Kaydet</button>
+      <button class="btn-danger" id="job-del-btn" onclick="deleteJob()" style="display:none">Sil</button>
+    </div>
+  </div>
+</div>
+
+<!-- CUSTOMER MODAL -->
+<div class="ov" id="ov-cust" onclick="closeOv('ov-cust',event)">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-hdr"><div class="modal-title" id="cust-modal-title">Yeni Müşteri</div><div class="modal-close" onclick="closeOv('ov-cust')">✕</div></div>
+    <div class="modal-body">
+      <input type="hidden" id="f-cid">
+      <div class="fg"><label>Ad Soyad / Firma *</label><input class="fi" id="f-cname" type="text" placeholder="Ad Soyad" autocomplete="off"></div>
+      <div class="fg"><label>Telefon</label><input class="fi" id="f-cphone" type="tel" placeholder="05xx xxx xx xx" inputmode="tel"></div>
+      <div class="fg"><label>Adres</label><input class="fi" id="f-caddr" type="text" placeholder="Adres" autocomplete="off"></div>
+      <div class="fg"><label>Not</label><input class="fi" id="f-cnote" type="text" placeholder="Ekstra bilgi" autocomplete="off"></div>
+      <button class="btn-p" onclick="saveCust()">Kaydet</button>
+      <button class="btn-danger" id="cust-del-btn" onclick="deleteCust()" style="display:none">Sil</button>
+    </div>
+  </div>
+</div>
+
+<!-- JOB DETAIL MODAL -->
+<div class="ov" id="ov-detail" onclick="closeOv('ov-detail',event)">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-hdr"><div class="modal-title" id="detail-title">İş Detayı</div><div class="modal-close" onclick="closeOv('ov-detail')">✕</div></div>
+    <div id="detail-body"></div>
+  </div>
+</div>
+
+<!-- CUSTOMER DETAIL -->
+<div class="ov" id="ov-cust-detail" onclick="closeOv('ov-cust-detail',event)">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-hdr"><div class="modal-title" id="cust-detail-title">Müşteri</div><div class="modal-close" onclick="closeOv('ov-cust-detail')">✕</div></div>
+    <div id="cust-detail-body"></div>
+  </div>
+</div>
+
+<div id="toast-wrap"></div>
+
+<script>
+/* ══ DATA ══ */
+const SK_JOBS='ng_jobs', SK_CUSTS='ng_custs';
+let jobs=[], custs=[];
+let editingJid=null, editingCid=null;
+let selJobStatus='planned', selPayStatus='pending';
+let jobMonth=new Date().getMonth(), jobYear=new Date().getFullYear();
+let finMonth=new Date().getMonth(), finYear=new Date().getFullYear();
+let ozetMonth=new Date().getMonth(), ozetYear=new Date().getFullYear();
+let jobFilter='';
+const MS=['Ocak','Şubat','Mart','Nisan','Mayıs','Haziran','Temmuz','Ağustos','Eylül','Ekim','Kasım','Aralık'];
+const NOW=new Date();
+
+function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,6);}
+function fmt(n){return Number(n||0).toLocaleString('tr-TR');}
+function fDate(s){if(!s)return'—';const d=new Date(s+'T00:00:00');return d.getDate()+' '+MS[d.getMonth()]+' '+d.getFullYear();}
+function pDate(s){if(!s)return null;return new Date(s+'T00:00:00');}
+function today(){return NOW.toISOString().slice(0,10);}
+
+function loadData(){
+  try{jobs=JSON.parse(localStorage.getItem(SK_JOBS)||'[]');}catch(e){jobs=[];}
+  try{custs=JSON.parse(localStorage.getItem(SK_CUSTS)||'[]');}catch(e){custs=[];}
+}
+function saveJobs(){localStorage.setItem(SK_JOBS,JSON.stringify(jobs));}
+function saveCusts(){localStorage.setItem(SK_CUSTS,JSON.stringify(custs));}
+
+/* ══ INIT ══ */
+loadData();
+document.getElementById('hdr-date').textContent=NOW.getDate()+' '+MS[NOW.getMonth()];
+document.getElementById('f-jdate').value=today();
+refreshAll();
+
+/* ══ TABS ══ */
+function goTab(tab){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.bnav-item').forEach(b=>b.classList.remove('active'));
+  document.getElementById('page-'+tab).classList.add('active');
+  document.querySelector(`[data-tab="${tab}"]`)?.classList.add('active');
+  if(tab==='jobs') renderJobs();
+  if(tab==='custs') renderCusts();
+  if(tab==='gelir') renderGelir();
+  if(tab==='ozet') renderOzet();
+}
+
+function refreshAll(){
+  renderPanel();
+  renderJobs();
+  renderCusts();
+  renderGelir();
+  renderOzet();
+  updateCustSuggestions();
+}
+
+/* ══ TOAST ══ */
+function toast(msg,type='info',dur=2800){
+  const wrap=document.getElementById('toast-wrap');
+  const el=document.createElement('div');
+  el.className='toast '+type;el.textContent=msg;
+  wrap.appendChild(el);
+  requestAnimationFrame(()=>requestAnimationFrame(()=>el.classList.add('show')));
+  setTimeout(()=>{el.classList.remove('show');setTimeout(()=>el.remove(),300);},dur);
+}
+
+/* ══ MODAL ══ */
+function openAddMenu(){document.getElementById('ov-addmenu').classList.add('open');}
+function closeOv(id,e){if(!e||e.target.classList.contains('ov'))document.getElementById(id).classList.remove('open');}
+function openJobModal(id=null){
+  editingJid=id;
+  document.getElementById('job-modal-title').textContent=id?'İşi Düzenle':'Yeni İş';
+  document.getElementById('job-del-btn').style.display=id?'block':'none';
+  document.getElementById('job-save-btn').textContent='Kaydet';
+  if(id){
+    const j=jobs.find(x=>x.id===id);if(!j)return;
+    document.getElementById('f-jid').value=id;
+    document.getElementById('f-jname').value=j.name||'';
+    document.getElementById('f-jphone').value=j.phone||'';
+    document.getElementById('f-jtype').value=j.type||'İlaçlama';
+    document.getElementById('f-jdate').value=j.date||'';
+    document.getElementById('f-jtime').value=j.time||'';
+    document.getElementById('f-jprice').value=j.price||'';
+    document.getElementById('f-jaddr').value=j.address||'';
+    document.getElementById('f-jnote').value=j.note||'';
+    selJobSt(j.status||'planned');
+    selPaySt(j.payStatus||'pending');
+  } else {
+    document.getElementById('f-jid').value='';
+    document.getElementById('f-jname').value='';
+    document.getElementById('f-jphone').value='';
+    document.getElementById('f-jtype').value='İlaçlama';
+    document.getElementById('f-jdate').value=today();
+    document.getElementById('f-jtime').value='';
+    document.getElementById('f-jprice').value='';
+    document.getElementById('f-jaddr').value='';
+    document.getElementById('f-jnote').value='';
+    selJobSt('planned');selPaySt('pending');
+  }
+  document.getElementById('ov-job').classList.add('open');
+}
+function openCustModal(id=null){
+  editingCid=id;
+  document.getElementById('cust-modal-title').textContent=id?'Müşteriyi Düzenle':'Yeni Müşteri';
+  document.getElementById('cust-del-btn').style.display=id?'block':'none';
+  if(id){
+    const c=custs.find(x=>x.id===id);if(!c)return;
+    document.getElementById('f-cid').value=id;
+    document.getElementById('f-cname').value=c.name||'';
+    document.getElementById('f-cphone').value=c.phone||'';
+    document.getElementById('f-caddr').value=c.address||'';
+    document.getElementById('f-cnote').value=c.note||'';
+  } else {
+    ['f-cid','f-cname','f-cphone','f-caddr','f-cnote'].forEach(id=>document.getElementById(id).value='');
+  }
+  document.getElementById('ov-cust').classList.add('open');
+}
+
+function selJobSt(v){
+  selJobStatus=v;
+  document.querySelectorAll('.st-opt[data-st]').forEach(o=>{
+    o.className='st-opt';
+    if(o.dataset.st===v) o.classList.add('sel-'+v);
+  });
+}
+function selPaySt(v){
+  selPayStatus=v;
+  document.querySelectorAll('.pay-opt').forEach(o=>{
+    o.className='pay-opt st-opt';
+    if(o.dataset.pay==='pending') {o.style.background='';o.style.color='var(--text2)';}
+    if(o.dataset.pay==='paid') {o.style.background='';o.style.color='var(--text2)';}
+  });
+  const el=document.querySelector(`.pay-opt[data-pay="${v}"]`);
+  if(el){
+    if(v==='pending'){el.style.background='var(--orange2)';el.style.color='var(--orange)';}
+    else{el.style.background='var(--green2)';el.style.color='var(--green)';}
+  }
+}
+
+/* ══ SAVE JOB ══ */
+function saveJob(){
+  const name=document.getElementById('f-jname').value.trim();
+  if(!name){toast('Müşteri adı zorunlu!','err');return;}
+  const date=document.getElementById('f-jdate').value;
+  if(!date){toast('Tarih zorunlu!','err');return;}
+  const j={
+    id:editingJid||uid(),
+    name,
+    phone:document.getElementById('f-jphone').value.trim(),
+    type:document.getElementById('f-jtype').value,
+    date,time:document.getElementById('f-jtime').value,
+    price:Number(document.getElementById('f-jprice').value)||0,
+    address:document.getElementById('f-jaddr').value.trim(),
+    note:document.getElementById('f-jnote').value.trim(),
+    status:selJobStatus,
+    payStatus:selPayStatus
+  };
+  if(editingJid){const i=jobs.findIndex(x=>x.id===editingJid);if(i>-1)jobs[i]=j;}
+  else jobs.unshift(j);
+  // Müşteriyi otomatik ekle/güncelle
+  autoAddCust(j.name,j.phone,j.address);
+  saveJobs();
+  closeOv('ov-job');
+  refreshAll();
+  toast(editingJid?'İş güncellendi ✓':'İş eklendi ✓','ok');
+  if(navigator.vibrate) navigator.vibrate(50);
+}
+
+function deleteJob(){
+  if(!editingJid)return;
+  jobs=jobs.filter(x=>x.id!==editingJid);
+  saveJobs();closeOv('ov-job');refreshAll();
+  toast('İş silindi','err');
+}
+
+/* ══ SAVE CUST ══ */
+function saveCust(){
+  const name=document.getElementById('f-cname').value.trim();
+  if(!name){toast('Müşteri adı zorunlu!','err');return;}
+  const c={
+    id:editingCid||uid(),
+    name,
+    phone:document.getElementById('f-cphone').value.trim(),
+    address:document.getElementById('f-caddr').value.trim(),
+    note:document.getElementById('f-cnote').value.trim()
+  };
+  if(editingCid){const i=custs.findIndex(x=>x.id===editingCid);if(i>-1)custs[i]=c;}
+  else custs.unshift(c);
+  saveCusts();closeOv('ov-cust');refreshAll();
+  toast(editingCid?'Müşteri güncellendi ✓':'Müşteri eklendi ✓','ok');
+}
+
+function deleteCust(){
+  if(!editingCid)return;
+  custs=custs.filter(x=>x.id!==editingCid);
+  saveCusts();closeOv('ov-cust');refreshAll();
+  toast('Müşteri silindi','err');
+}
+
+function autoAddCust(name,phone,address){
+  if(!custs.find(c=>c.name.toLowerCase()===name.toLowerCase())){
+    custs.push({id:uid(),name,phone:phone||'',address:address||'',note:''});
+    saveCusts();
+    updateCustSuggestions();
+  }
+}
+
+function updateCustSuggestions(){
+  const dl=document.getElementById('cust-suggestions');
+  if(dl) dl.innerHTML=custs.map(c=>`<option value="${c.name}">`).join('');
+}
+
+/* ══ TYPE BADGE ══ */
+function typeBadge(type){
+  const cls=type==='İlaçlama'?'badge-ilac':type==='Temizlik'?'badge-temiz':type==='Lojistik'?'badge-lojis':'badge-diger';
+  const ico=type==='İlaçlama'?'🦟':type==='Temizlik'?'🧹':type==='Lojistik'?'🚚':'📋';
+  return`<span class="job-badge ${cls}">${ico} ${type}</span>`;
+}
+function statusLabel(s){
+  return s==='done'?'Tamamlandı':s==='cancelled'?'İptal':'Planlandı';
+}
+function statusCls(s){
+  return s==='done'?'st-done':s==='cancelled'?'st-cancelled':'st-planned';
+}
+
+/* ══ PANEL ══ */
+function renderPanel(){
+  const todayStr=today();
+  const thisMonth=NOW.getMonth(), thisYear=NOW.getFullYear();
+  const monthJobs=jobs.filter(j=>{const d=pDate(j.date);return d&&d.getMonth()===thisMonth&&d.getFullYear()===thisYear;});
+  const todayJobs=jobs.filter(j=>j.date===todayStr&&j.status!=='cancelled');
+  const done=monthJobs.filter(j=>j.status==='done').length;
+  const pendingPay=jobs.filter(j=>j.payStatus==='pending'&&j.status!=='cancelled').length;
+  const income=monthJobs.filter(j=>j.payStatus==='paid').reduce((s,j)=>s+j.price,0);
+  const incomeTotal=monthJobs.filter(j=>j.status!=='cancelled').reduce((s,j)=>s+j.price,0);
+
+  document.getElementById('d-total').textContent=monthJobs.length;
+  document.getElementById('d-done').textContent=done;
+  document.getElementById('d-pending').textContent=pendingPay;
+  document.getElementById('d-custs').textContent=custs.length;
+  document.getElementById('d-income').textContent=fmt(income)+' ₺';
+  document.getElementById('d-income-sub').textContent=`/ ${fmt(incomeTotal)} ₺ toplam`;
+
+  // Today jobs
+  const tj=document.getElementById('today-jobs');
+  if(!todayJobs.length){
+    tj.innerHTML='<span style="font-size:12px;color:var(--text2);">Bugün iş yok</span>';
+  } else {
+    tj.innerHTML=todayJobs.map(j=>`<span class="today-chip">${j.type==='İlaçlama'?'🦟':j.type==='Temizlik'?'🧹':'🚚'} ${j.name}${j.time?' · '+j.time:''}</span>`).join('');
+  }
+
+  // Upcoming
+  const up=jobs.filter(j=>j.date>=todayStr&&j.status==='planned').sort((a,b)=>a.date.localeCompare(b.date)||((a.time||'').localeCompare(b.time||''))).slice(0,5);
+  const ul=document.getElementById('upcoming-list');
+  ul.innerHTML=up.length?up.map(j=>`
+    <div class="job-card" onclick="openDetail('${j.id}')">
+      <div class="job-top">
+        <div class="job-name">${j.name}</div>
+        ${typeBadge(j.type)}
+      </div>
+      <div class="job-meta">
+        <span class="job-meta-item">📅 ${fDate(j.date)}${j.time?' · ⏰ '+j.time:''}</span>
+        ${j.address?`<span class="job-meta-item">📍 ${j.address}</span>`:''}
+      </div>
+      <div class="job-bottom">
+        <div class="job-price">${j.price?fmt(j.price)+' ₺':'—'}</div>
+        <div class="job-status ${statusCls(j.status)}">${statusLabel(j.status)}</div>
+      </div>
+    </div>`).join(''):'<div class="empty-s"><div class="ei">✅</div><div class="et">Yaklaşan iş yok</div></div>';
+}
+
+/* ══ JOBS ══ */
+function changeJobMonth(d){
+  jobMonth+=d;
+  if(jobMonth<0){jobMonth=11;jobYear--;}
+  if(jobMonth>11){jobMonth=0;jobYear++;}
+  renderJobs();
+}
+function filterJobs(type){jobFilter=type;renderJobs();}
+
+function renderJobs(){
+  document.getElementById('job-month-label').textContent=MS[jobMonth]+' '+jobYear;
+  let filtered=jobs.filter(j=>{const d=pDate(j.date);return d&&d.getMonth()===jobMonth&&d.getFullYear()===jobYear;});
+  if(jobFilter) filtered=filtered.filter(j=>j.type===jobFilter);
+  filtered.sort((a,b)=>b.date.localeCompare(a.date)||((b.time||'').localeCompare(a.time||'')));
+  const el=document.getElementById('jobs-list');
+  el.innerHTML=filtered.length?filtered.map(j=>`
+    <div class="job-card" onclick="openDetail('${j.id}')">
+      <div class="job-top">
+        <div class="job-name">${j.name}</div>
+        ${typeBadge(j.type)}
+      </div>
+      <div class="job-meta">
+        <span class="job-meta-item">📅 ${fDate(j.date)}${j.time?' · ⏰ '+j.time:''}</span>
+        ${j.address?`<span class="job-meta-item">📍 ${j.address}</span>`:''}
+      </div>
+      <div class="job-bottom">
+        <div class="job-price">${j.price?fmt(j.price)+' ₺':'—'}</div>
+        <div style="display:flex;gap:6px;align-items:center;">
+          <div class="job-status ${j.payStatus==='paid'?'st-done':'st-pending'}">${j.payStatus==='paid'?'Ödendi':'Bekliyor'}</div>
+          <div class="job-status ${statusCls(j.status)}">${statusLabel(j.status)}</div>
+        </div>
+      </div>
+    </div>`).join(''):'<div class="empty-s"><div class="ei">📋</div><div class="et">Bu ayda iş yok</div></div>';
+}
+
+/* ══ DETAIL ══ */
+function openDetail(id){
+  const j=jobs.find(x=>x.id===id);if(!j)return;
+  document.getElementById('detail-title').textContent=j.name;
+  document.getElementById('detail-body').innerHTML=`
+    <div class="det-sec" style="margin-top:14px;">
+      <div class="det-row"><div class="det-ico">${j.type==='İlaçlama'?'🦟':j.type==='Temizlik'?'🧹':'🚚'}</div><div><div class="det-k">İş Tipi</div><div class="det-v">${j.type}</div></div></div>
+      <div class="det-row"><div class="det-ico">📅</div><div><div class="det-k">Tarih</div><div class="det-v">${fDate(j.date)}${j.time?' · '+j.time:''}</div></div></div>
+      ${j.phone?`<div class="det-row"><div class="det-ico">📞</div><div><div class="det-k">Telefon</div><div class="det-v"><a href="tel:${j.phone}" style="color:var(--blue);text-decoration:none;">${j.phone}</a></div></div></div>`:''}
+      ${j.address?`<div class="det-row"><div class="det-ico">📍</div><div><div class="det-k">Adres</div><div class="det-v">${j.address}</div></div></div>`:''}
+      <div class="det-row"><div class="det-ico">💰</div><div><div class="det-k">Ücret</div><div class="det-v">${j.price?fmt(j.price)+' ₺':'—'}</div></div></div>
+      <div class="det-row"><div class="det-ico">💳</div><div><div class="det-k">Ödeme</div><div class="det-v" style="color:${j.payStatus==='paid'?'var(--green)':'var(--orange)'}">${j.payStatus==='paid'?'✓ Ödendi':'⏳ Bekliyor'}</div></div></div>
+      <div class="det-row"><div class="det-ico">🔖</div><div><div class="det-k">Durum</div><div class="det-v">${statusLabel(j.status)}</div></div></div>
+      ${j.note?`<div class="det-row"><div class="det-ico">📝</div><div><div class="det-k">Not</div><div class="det-v">${j.note}</div></div></div>`:''}
+    </div>
+    <div class="det-actions">
+      <div class="det-btn det-edit" onclick="closeOv('ov-detail');setTimeout(()=>openJobModal('${j.id}'),200)">✏️ Düzenle</div>
+      ${j.payStatus==='pending'?`<div class="det-btn" style="background:var(--green2);border:.5px solid rgba(34,197,94,.3);color:var(--green);" onclick="markPaid('${j.id}')">✓ Ödendi</div>`:`<div class="det-btn" style="background:var(--orange2);border:.5px solid rgba(245,158,11,.3);color:var(--orange);" onclick="markPending('${j.id}')">⏳ Bekliyor</div>`}
+    </div>`;
+  document.getElementById('ov-detail').classList.add('open');
+}
+
+function markPaid(id){
+  const j=jobs.find(x=>x.id===id);if(!j)return;
+  j.payStatus='paid';saveJobs();refreshAll();
+  closeOv('ov-detail');toast('Ödeme alındı ✓','ok');
+  if(navigator.vibrate) navigator.vibrate(50);
+}
+function markPending(id){
+  const j=jobs.find(x=>x.id===id);if(!j)return;
+  j.payStatus='pending';saveJobs();refreshAll();
+  closeOv('ov-detail');toast('Bekliyor olarak işaretlendi','info');
+}
+
+/* ══ CUSTOMERS ══ */
+function renderCusts(){
+  const el=document.getElementById('custs-list');
+  if(!custs.length){el.innerHTML='<div class="empty-s"><div class="ei">👥</div><div class="et">Henüz müşteri yok</div></div>';return;}
+  el.innerHTML=custs.map(c=>{
+    const cJobs=jobs.filter(j=>j.name.toLowerCase()===c.name.toLowerCase());
+    const totalPaid=cJobs.filter(j=>j.payStatus==='paid').reduce((s,j)=>s+j.price,0);
+    return`<div class="cust-card" onclick="openCustDetail('${c.id}')">
+      <div class="cust-top">
+        <div class="cust-avatar">👤</div>
+        <div class="cust-info">
+          <div class="cust-name">${c.name}</div>
+          ${c.phone?`<div class="cust-phone">📞 ${c.phone}</div>`:''}
+        </div>
+      </div>
+      <div class="cust-stats">
+        <span class="cust-stat">📋 ${cJobs.length} iş</span>
+        ${totalPaid?`<span class="cust-stat">💰 ${fmt(totalPaid)} ₺</span>`:''}
+        ${c.address?`<span class="cust-stat">📍 ${c.address.slice(0,20)}</span>`:''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function openCustDetail(id){
+  const c=custs.find(x=>x.id===id);if(!c)return;
+  const cJobs=jobs.filter(j=>j.name.toLowerCase()===c.name.toLowerCase()).sort((a,b)=>b.date.localeCompare(a.date));
+  document.getElementById('cust-detail-title').textContent=c.name;
+  document.getElementById('cust-detail-body').innerHTML=`
+    <div class="det-sec" style="margin-top:14px;">
+      ${c.phone?`<div class="det-row"><div class="det-ico">📞</div><div><div class="det-k">Telefon</div><div class="det-v"><a href="tel:${c.phone}" style="color:var(--blue);text-decoration:none;">${c.phone}</a></div></div></div>`:''}
+      ${c.address?`<div class="det-row"><div class="det-ico">📍</div><div><div class="det-k">Adres</div><div class="det-v">${c.address}</div></div></div>`:''}
+      ${c.note?`<div class="det-row"><div class="det-ico">📝</div><div><div class="det-k">Not</div><div class="det-v">${c.note}</div></div></div>`:''}
+    </div>
+    <div class="sec-lbl">GEÇMİŞ İŞLER (${cJobs.length})</div>
+    <div style="padding:0 14px;display:flex;flex-direction:column;gap:8px;margin-bottom:14px;">
+      ${cJobs.length?cJobs.map(j=>`
+        <div style="background:var(--card);border:.5px solid var(--border);border-radius:12px;padding:12px 14px;cursor:pointer;" onclick="closeOv('ov-cust-detail');setTimeout(()=>openDetail('${j.id}'),200)">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <div>${typeBadge(j.type)} <span style="font-size:12px;color:var(--text2);margin-left:6px;">${fDate(j.date)}</span></div>
+            <div style="font-weight:700;color:var(--blue);">${j.price?fmt(j.price)+' ₺':'—'}</div>
+          </div>
+        </div>`).join(''):'<div style="color:var(--text2);font-size:12px;">İş kaydı yok</div>'}
+    </div>
+    <div class="det-actions">
+      <div class="det-btn det-edit" onclick="closeOv('ov-cust-detail');setTimeout(()=>openCustModal('${c.id}'),200)">✏️ Düzenle</div>
+    </div>`;
+  document.getElementById('ov-cust-detail').classList.add('open');
+}
+
+/* ══ GELİR ══ */
+function changeFinMonth(d){
+  finMonth+=d;
+  if(finMonth<0){finMonth=11;finYear--;}
+  if(finMonth>11){finMonth=0;finYear++;}
+  renderGelir();
+}
+function renderGelir(){
+  document.getElementById('fin-month-label').textContent=MS[finMonth]+' '+finYear;
+  const mJobs=jobs.filter(j=>{const d=pDate(j.date);return d&&d.getMonth()===finMonth&&d.getFullYear()===finYear&&j.status!=='cancelled';});
+  const total=mJobs.reduce((s,j)=>s+j.price,0);
+  const paid=mJobs.filter(j=>j.payStatus==='paid').reduce((s,j)=>s+j.price,0);
+  const pending=mJobs.filter(j=>j.payStatus==='pending').reduce((s,j)=>s+j.price,0);
+  document.getElementById('fin-total').textContent=fmt(total)+' ₺';
+  document.getElementById('fin-paid').textContent=fmt(paid)+' ₺';
+  document.getElementById('fin-pending').textContent=fmt(pending)+' ₺';
+  document.getElementById('fin-count').textContent=mJobs.length;
+
+  const sorted=mJobs.sort((a,b)=>b.date.localeCompare(a.date));
+  document.getElementById('fin-list').innerHTML=sorted.length?sorted.map(j=>`
+    <div class="fin-item" onclick="openDetail('${j.id}')">
+      <div class="fin-item-left">
+        <div class="fin-item-name">${j.name}</div>
+        <div class="fin-item-meta">${typeBadge(j.type)} <span style="margin-left:4px;">${fDate(j.date)}</span></div>
+      </div>
+      <div class="fin-item-right">
+        <div class="fin-item-amt" style="color:${j.payStatus==='paid'?'var(--green)':'var(--orange)'};">${j.price?fmt(j.price)+' ₺':'—'}</div>
+        <div class="fin-item-status ${j.payStatus==='paid'?'st-done':'st-pending'}">${j.payStatus==='paid'?'Ödendi':'Bekliyor'}</div>
+      </div>
+    </div>`).join(''):'<div class="empty-s"><div class="ei">💰</div><div class="et">Bu ayda kayıt yok</div></div>';
+}
+
+/* ══ ÖZET ══ */
+function changeOzetMonth(d){
+  ozetMonth+=d;
+  if(ozetMonth<0){ozetMonth=11;ozetYear--;}
+  if(ozetMonth>11){ozetMonth=0;ozetYear++;}
+  renderOzet();
+}
+function renderOzet(){
+  document.getElementById('ozet-month-label').textContent=MS[ozetMonth]+' '+ozetYear;
+  const mj=jobs.filter(j=>{const d=pDate(j.date);return d&&d.getMonth()===ozetMonth&&d.getFullYear()===ozetYear&&j.status!=='cancelled';});
+  const types=['İlaçlama','Temizlik','Lojistik','Diğer'];
+  const typeIco=['🦟','🧹','🚚','📋'];
+  const typeCounts=types.map(t=>mj.filter(j=>j.type===t).length);
+  const typeIncome=types.map(t=>mj.filter(j=>j.type===t&&j.payStatus==='paid').reduce((s,j)=>s+j.price,0));
+  const total=mj.length, totalInc=mj.filter(j=>j.payStatus==='paid').reduce((s,j)=>s+j.price,0);
+
+  // Grid
+  document.getElementById('ozet-grid').innerHTML=`
+    ${types.map((t,i)=>`<div class="oz-card"><div class="oz-ico">${typeIco[i]}</div><div class="oz-val">${typeCounts[i]}</div><div class="oz-lbl">${t}</div></div>`).join('')}
+    <div class="oz-card" style="background:linear-gradient(135deg,rgba(34,197,94,.1),rgba(34,197,94,.05));border-color:rgba(34,197,94,.2);"><div class="oz-ico">💰</div><div class="oz-val" style="color:var(--green);font-size:14px;">${fmt(totalInc)} ₺</div><div class="oz-lbl">Gelir</div></div>
+    <div class="oz-card"><div class="oz-ico">📋</div><div class="oz-val">${total}</div><div class="oz-lbl">Toplam İş</div></div>`;
+
+  // Bars
+  const maxCount=Math.max(...typeCounts,1);
+  document.getElementById('ozet-bars').innerHTML=types.map((t,i)=>`
+    <div class="bar-item">
+      <div class="bar-lbl"><span>${typeIco[i]} ${t}</span><span style="font-weight:700;">${typeCounts[i]} iş · ${fmt(typeIncome[i])} ₺</span></div>
+      <div class="bar-track"><div class="bar-fill" style="width:${typeCounts[i]/maxCount*100}%;background:${i===0?'var(--red)':i===1?'var(--green)':i===2?'var(--orange)':'var(--blue)'};"></div></div>
+    </div>`).join('');
+
+  // Ciro last 6 months
+  const ciros=[];
+  for(let i=5;i>=0;i--){
+    let m=ozetMonth-i, y=ozetYear;
+    if(m<0){m+=12;y--;}
+    const mj2=jobs.filter(j=>{const d=pDate(j.date);return d&&d.getMonth()===m&&d.getFullYear()===y&&j.payStatus==='paid';});
+    ciros.push({label:MS[m].slice(0,3),val:mj2.reduce((s,j)=>s+j.price,0)});
+  }
+  const maxCiro=Math.max(...ciros.map(c=>c.val),1);
+  document.getElementById('ozet-ciro').innerHTML=ciros.map(c=>`
+    <div class="bar-item">
+      <div class="bar-lbl"><span>${c.label}</span><span style="font-weight:700;">${fmt(c.val)} ₺</span></div>
+      <div class="bar-track"><div class="bar-fill" style="width:${c.val/maxCiro*100}%;background:var(--blue);"></div></div>
+    </div>`).join('');
+}
+</script>
+</body>
+</html>
